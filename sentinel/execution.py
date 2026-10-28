@@ -13,7 +13,7 @@ import numpy as np
 from .alerts import Alerts
 from .data import last_bar_age_days
 from .options import choose_structure, iv_rank_proxy, select_contracts
-from .strategy import compute_signals, describe
+from .strategy import compute_rank, compute_signals, describe
 
 
 def run_once(cfg: dict, broker, mem, risk, data: dict, dry_run: bool = False, log=print) -> dict:
@@ -29,6 +29,9 @@ def run_once(cfg: dict, broker, mem, risk, data: dict, dry_run: bool = False, lo
         return {"error": "execution layer currently trades long strategies only"}
     log(f"[{broker.name}] strategy {champ['hash']} ({role}): {describe(spec)}")
     p, bt = spec["params"], cfg["backtest"]
+    if bt["max_positions"] > risk.limits["max_open_positions"]:
+        log(f"warning: backtest assumes {bt['max_positions']} positions but risk_limits.yaml caps live/paper at "
+            f"{risk.limits['max_open_positions']} — results will differ from the backtest")
     out = {"strategy": champ["hash"], "broker": broker.name, "exits": [], "entries": [], "skipped": [], "options": []}
 
     # stale data guard: never trade on old bars
@@ -68,7 +71,12 @@ def run_once(cfg: dict, broker, mem, risk, data: dict, dry_run: bool = False, lo
 
     # entries
     gross = sum(v["qty"] * v["avg_price"] for v in held.values())
-    for s, (ent, ex, at) in sigs.items():
+    def _rank(s):
+        r = float(compute_rank(spec, data[s]).iloc[-1])
+        return -r if math.isfinite(r) else math.inf
+
+    for s in sorted(sigs, key=_rank):  # strongest first, same order as the backtest
+        ent, ex, at = sigs[s]
         if stale or not ent.iloc[-1] or s in held:
             continue
         df, a = data[s], float(at.iloc[-1])

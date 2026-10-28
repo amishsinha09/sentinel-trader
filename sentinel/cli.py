@@ -56,11 +56,35 @@ def cmd_validate(args):
     if not mem.exists(spec_hash(spec)):
         failed = [c["name"] for c in rep["checks"] if not c["pass"]]
         mem.record(spec_hash(spec), spec, rep, "manual_validate", "manual validation", "human", reasons=failed)
+    _print_gate(rep)
+
+
+def _print_gate(rep):
     for c in rep["checks"]:
         print(f"  {'PASS' if c['pass'] else 'FAIL'}  {c['name']:26} {c['value']}  (need {c['threshold']})")
-    b = rep["benchmark_validation"]
-    print(f"  info  buy & hold (same window): sharpe {b['sharpe']:.2f}, maxDD {b['max_drawdown']:.1%}")
+    v, b = rep["validation"], rep["benchmark_validation"]
+    print(f"  info  strategy (OOS):   sharpe {v['sharpe']:.2f}, maxDD {v['max_drawdown']:.1%}, CAGR {v['cagr']:.1%}")
+    print(f"  info  buy & hold (OOS): sharpe {b['sharpe']:.2f}, maxDD {b['max_drawdown']:.1%}, CAGR {b['cagr']:.1%}")
     print("GATE:", "PASSED" if rep["passed"] else "FAILED")
+
+
+def cmd_baseline(args):
+    """Start research from a new idea. It is scored like any candidate and counts as a trial."""
+    from .strategy import describe, spec_hash, validate_spec
+    from .validation import evaluate_candidate
+
+    cfg, mem, _, load = _ctx(args)
+    spec = validate_spec(json.loads(resolve(args.spec).read_text(encoding="utf-8")))
+    h = spec_hash(spec)
+    rep = evaluate_candidate(spec, load(), cfg, mem.trial_count() + (0 if mem.exists(h) else 1), mem.trial_sr_var())
+    failed = [c["name"] for c in rep["checks"] if not c["pass"]]
+    mem.record(h, spec, rep, "baseline", f"New starting idea: {spec['name']}", "human", reasons=failed)
+    mem.set_champion("research", h, "human")
+    print(f"research now starts from {h}: {describe(spec)}")
+    _print_gate(rep)
+    if rep["passed"] and cfg["research"]["auto_promote_paper"]:
+        mem.set_champion("paper", h, "human")
+        print(f"passed the gate -> paper strategy is now {h}")
 
 
 def cmd_research(args):
@@ -181,6 +205,8 @@ def main(argv=None):
     p.add_argument("--spec"); p.add_argument("--role", default="paper")
     p = add("validate", cmd_validate, "run the full validation gate on a spec")
     p.add_argument("--spec"); p.add_argument("--role", default="paper")
+    p = add("baseline", cmd_baseline, "start research from a new strategy idea (counts as a trial)")
+    p.add_argument("--spec", required=True)
     p = add("research", cmd_research, "run the AI self-improvement loop")
     p.add_argument("--iterations", type=int)
     add("status", cmd_status, "champions, trials, risk state")

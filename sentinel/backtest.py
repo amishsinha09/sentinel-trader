@@ -17,7 +17,7 @@ import numpy as np
 import pandas as pd
 
 from .metrics import perf_metrics
-from .strategy import compute_signals, validate_spec
+from .strategy import compute_rank, compute_signals, validate_spec
 
 
 @dataclass
@@ -55,7 +55,7 @@ class BacktestResult:
 
 
 def precompute(spec: dict, data: dict[str, pd.DataFrame]) -> dict:
-    return {s: compute_signals(spec, df) for s, df in data.items()}
+    return {s: (*compute_signals(spec, df), compute_rank(spec, df)) for s, df in data.items()}
 
 
 def run_backtest(spec: dict, data: dict[str, pd.DataFrame], bt: dict, start=None, end=None,
@@ -77,9 +77,10 @@ def run_backtest(spec: dict, data: dict[str, pd.DataFrame], bt: dict, start=None
     A = {}
     for s in syms:
         df = data[s].reindex(idx)
-        ent, ex, at = (x.reindex(idx) for x in sigs[s])
+        ent, ex, at, rk = (x.reindex(idx) for x in sigs[s])
         A[s] = (df.open.to_numpy(), df.high.to_numpy(), df.low.to_numpy(), df.close.to_numpy(),
-                ent.fillna(False).to_numpy(bool), ex.fillna(False).to_numpy(bool), at.to_numpy())
+                ent.fillna(False).to_numpy(bool), ex.fillna(False).to_numpy(bool), at.to_numpy(),
+                rk.to_numpy(float))
 
     cash = float(bt.get("initial_capital", 100000.0))
     pos: dict[str, Position] = {}
@@ -118,11 +119,12 @@ def run_backtest(spec: dict, data: dict[str, pd.DataFrame], bt: dict, start=None
         if i > 0:
             eq_prev = equity[i - 1]
             gross = sum(ps.qty * ps.last for ps in pos.values())
-            for s in syms:
+            cands = [s for s in syms if s not in pos and A[s][4][i - 1]]
+            # strongest rank first; NaN ranks last; ties keep universe order (stable sort)
+            cands.sort(key=lambda s: -A[s][7][i - 1] if np.isfinite(A[s][7][i - 1]) else np.inf)
+            for s in cands:
                 if len(pos) >= bt.get("max_positions", 5):
                     break
-                if s in pos or not A[s][4][i - 1]:
-                    continue
                 o, a = A[s][0][i], A[s][6][i - 1]
                 if np.isnan(o) or np.isnan(a) or a <= 0:
                     continue

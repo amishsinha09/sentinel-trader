@@ -1,0 +1,22 @@
+{
+  "name": "trend_momentum",
+  "version": "1.0",
+  "description": "Long-term trend following with momentum ranking (after Faber 2007; Moskowitz, Ooi & Pedersen 2012). Hold assets above their 200-day average with positive 6-month momentum; strongest first; exit when the trend breaks.",
+  "direction": "long",
+  "params": {
+    "sma_trend": 200,
+    "mom_period": 126,
+    "atr_period": 20,
+    "stop_atr": 5.0,
+    "target_atr": 20.0,
+    "max_hold_bars": 250
+  },
+  "entry": {"all": [
+    {"left": "close", "op": ">", "right": "sma(sma_trend)"},
+    {"left": "roc(mom_period)", "op": ">", "right": 0}
+  ]},
+  "exit": {"any": [
+    {"left": "close", "op": "<", "right": "sma(sma_trend)"}
+  ]},
+  "rank_by": "roc(mom_period)"
+}

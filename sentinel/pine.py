@@ -78,7 +78,7 @@ def to_pine(spec: dict, bt: dict, strategy_id: str = "") -> str:
     plot_lines = "\n".join(f'plot({e}, "{e}", linewidth=1)' for e in plots)
     return f"""//@version=5
 // Sentinel Trader export — strategy {strategy_id or s['name']} v{s['version']}
-// {s.get('description', '')}
+// {s.get('description', '')}{chr(10) + "// rank_by (" + s["rank_by"] + ") applies to multi-symbol portfolios only; ignored on a single chart" if "rank_by" in s else ""}
 strategy("Sentinel: {s['name']} {strategy_id}", overlay=true, initial_capital={int(bt.get('initial_capital', 100000))},
      commission_type=strategy.commission.percent, commission_value={comm_pct:.4f}, slippage=0,
      pyramiding=0, process_orders_on_close=false)

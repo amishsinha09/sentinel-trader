@@ -15,6 +15,8 @@ Example:
 Terms: a number | a column (open/high/low/close/volume) | param(name) | indicator(period)
 where period is an int literal or a param name. Ops: > >= < <= crosses_above crosses_below.
 Optional "scale" on a condition multiplies the right-hand side.
+Optional top-level "rank_by": a term (e.g. "roc(126)"). When more symbols signal than there are
+free position slots, the highest-ranked enter first (otherwise: universe order).
 Signals are computed at the bar close and executed at the NEXT bar's open by the engine.
 """
 from __future__ import annotations
@@ -31,7 +33,7 @@ from .features import INDICATORS, FeatureCache, atr
 
 COLUMNS = {"open", "high", "low", "close", "volume"}
 OPS = {">", ">=", "<", "<=", "crosses_above", "crosses_below"}
-TOP_KEYS = {"name", "version", "direction", "params", "entry", "exit", "description", "parent"}
+TOP_KEYS = {"name", "version", "direction", "params", "entry", "exit", "description", "parent", "rank_by"}
 TERM_RE = re.compile(r"^([a-z_]+)\(([A-Za-z0-9_.]+)\)$")
 RESERVED = {  # name: (min, max, type, default)
     "atr_period": (2, 100, int, 14),
@@ -107,6 +109,8 @@ def validate_spec(spec: dict) -> dict:
         if not lo <= v <= hi:
             raise SpecError(f"{k}={v} out of range [{lo},{hi}]")
         params[k] = typ(v)
+    if "rank_by" in s:
+        parse_term(s["rank_by"], params)
     for block, key, limit, required in (("entry", "all", MAX_ENTRY_CONDITIONS, True),
                                         ("exit", "any", MAX_EXIT_CONDITIONS, False)):
         b = s.get(block)
@@ -179,6 +183,14 @@ def compute_signals(spec: dict, df: pd.DataFrame):
     return entry, exit_, atr(df, p["atr_period"])
 
 
+def compute_rank(spec: dict, df: pd.DataFrame) -> pd.Series:
+    """Ranking score per bar (higher enters first). Constant 0 when the spec has no rank_by."""
+    spec = validate_spec(spec)
+    if "rank_by" not in spec:
+        return pd.Series(0.0, index=df.index)
+    return _eval(FeatureCache(df), parse_term(spec["rank_by"], spec["params"]), df.index).astype(float)
+
+
 def describe(spec: dict) -> str:
     def side(conds, joiner):
         return f" {joiner} ".join(f"{c['left']} {c['op']} {c['right']}" + (f" x{c['scale']}" if "scale" in c else "")
@@ -186,4 +198,5 @@ def describe(spec: dict) -> str:
     p = spec["params"]
     return (f"{spec['direction'].upper()} when {side(spec['entry']['all'], 'AND')}; "
             f"exit when {side(spec['exit']['any'], 'OR')}; stop {p['stop_atr']}xATR, "
-            f"target {p['target_atr']}xATR, max hold {p['max_hold_bars']} bars")
+            f"target {p['target_atr']}xATR, max hold {p['max_hold_bars']} bars"
+            + (f"; rank by {spec['rank_by']}" if "rank_by" in spec else ""))

@@ -13,9 +13,9 @@ backtest:
   initial_capital: 100000
   spread_bps: 2.0
   slippage_bps: 3.0
-  max_positions: 8            # more instruments -> hold more, smaller positions
+  max_positions: 5            # matches max_open_positions in risk_limits.yaml (top-5 rotation)
   risk_per_trade: 0.01
-  max_position_pct: 0.15
+  max_position_pct: 0.20
   max_gross_exposure: 1.0
 
 state_dir: state_etf

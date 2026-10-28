@@ -53,6 +53,19 @@ class TestStrategy(unittest.TestCase):
         s["name"] = "renamed"
         self.assertEqual(spec_hash(validate_spec(s)), spec_hash(validate_spec(BASE)))
 
+    def test_rank_by_prefers_strongest(self):
+        """With one slot and two simultaneous signals, the higher-ranked symbol must be bought."""
+        idx = pd.bdate_range("2020-01-01", periods=60)
+        def frame(drift):
+            c = 100 * (1 + drift) ** np.arange(60)
+            return pd.DataFrame({"open": c, "high": c * 1.001, "low": c * 0.999, "close": c, "volume": 1e6}, index=idx)
+        data = {"SLOW": frame(0.001), "FAST": frame(0.01)}
+        spec = {"direction": "long", "params": {"max_hold_bars": 250, "target_atr": 20, "stop_atr": 10},
+                "entry": {"all": [{"left": "roc(20)", "op": ">", "right": 0}]}, "rank_by": "roc(20)"}
+        bt = dict(self.cfg["backtest"], max_positions=1)
+        r = run_backtest(spec, data, bt)
+        self.assertEqual(r.trades.iloc[0].symbol, "FAST")
+
     def test_costs_reduce_returns(self):
         cheap = run_backtest(BASE, self.data, self.cfg["backtest"]).metrics["total_return"]
         dear = run_backtest(BASE, self.data, self.cfg["backtest"], cost_mult=5).metrics["total_return"]

@@ -64,7 +64,7 @@ python -m venv .venv && source .venv/bin/activate      # Windows: .venv\Scripts\
 pip install -r requirements.txt
 cp .env.example .env                                     # add keys later
 
-python -m unittest discover -s tests                     # 16 tests
+python -m unittest discover -s tests                     # 17 tests
 python -m sentinel --source synthetic research --iterations 5   # offline dry run
 rm -rf state                                             # wipe the dry-run memory
 ```
@@ -106,6 +106,20 @@ Robinhood has no public stock-trading API for bots. Use `execution.broker: ticke
 ## Options
 
 Set `execution.options_enabled: true`. A bullish signal maps to a structure by IV regime: call debit spread, long call when conviction is high and IV is low, or bull put credit spread when IV is high. Contracts are chosen for liquidity (OI, bid/ask %), 14–60 DTE, and target deltas, then sized so max loss stays within `options.max_loss_per_trade_pct`. Only defined-risk structures are allowed. Without a broker chain feed, the bot logs the intended structure only. Options backtesting is not modelled yet, so validate option rules on paper first.
+
+## Research profiles and new ideas
+
+```bash
+# 15 diversified ETFs (sectors, small caps, international, bonds, gold), separate state_etf/ folder
+python -m sentinel --settings config/settings_etf.yaml research
+
+# Start research from a different idea. Scored like any candidate, and counted as a trial.
+python -m sentinel --settings config/settings_etf.yaml baseline --spec strategies/trend_momentum.json
+```
+
+Included ideas: `trend_pullback` (short-term swing; rejected on both universes in testing) and
+`trend_momentum` (hold above the 200-day SMA with positive 6-month momentum, strongest first).
+A spec's optional `rank_by` term decides which signals fill the free position slots.
 
 ## Extending
 

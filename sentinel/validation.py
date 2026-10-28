@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 
 from .backtest import buy_and_hold, precompute, run_backtest
-from .metrics import deflated_sharpe
+from .metrics import deflated_sharpe, probabilistic_sharpe
 from .strategy import RESERVED, SpecError, validate_spec
 
 
@@ -106,3 +106,26 @@ def holdout_check(spec: dict, data: dict, cfg: dict, val_sharpe: float) -> dict:
     ]
     return {"passed": all(ok for _, ok in checks), "checks": [{"name": n, "pass": bool(ok)} for n, ok in checks],
             "metrics": m, "window": [str(w["holdout"][0].date()), str(w["holdout"][1].date())]}
+
+
+def confirm_on_holdout(spec: dict, data: dict, cfg: dict) -> dict:
+    """One-shot confirmatory test of ONE pre-chosen strategy on never-used data.
+
+    No multiple-testing penalty is needed because the candidate was chosen without seeing
+    this data, so the bar is a plain Probabilistic Sharpe Ratio against zero, plus it must
+    match buy & hold on a risk-adjusted basis over the same years.
+    """
+    w = split_dates(data, cfg["splits"])
+    res = run_backtest(spec, data, cfg["backtest"], *w["holdout"])
+    bench = buy_and_hold(data, *w["holdout"], cfg["backtest"]["initial_capital"]).metrics
+    m, v = res.metrics, cfg["validation"]
+    psr = probabilistic_sharpe(m["sr_period"], 0.0, m["n_days"], m["skew"], m["kurtosis"])
+    checks = [
+        ("confidence_sharpe_above_zero", psr >= 0.90, round(psr, 3), 0.90),
+        ("sharpe_at_least_buy_and_hold", m["sharpe"] >= bench["sharpe"], round(m["sharpe"], 3), round(bench["sharpe"], 3)),
+        ("max_drawdown", m["max_drawdown"] <= v["max_oos_drawdown"], round(m["max_drawdown"], 3), v["max_oos_drawdown"]),
+        ("min_trades", m["n_trades"] >= v["min_trades_oos"], m["n_trades"], v["min_trades_oos"]),
+    ]
+    return {"passed": all(ok for _, ok, _, _ in checks), "kind": "confirmation", "psr": psr,
+            "checks": [{"name": n, "pass": bool(ok), "value": val, "threshold": thr} for n, ok, val, thr in checks],
+            "metrics": m, "benchmark": bench, "window": [str(w["holdout"][0].date()), str(w["holdout"][1].date())]}

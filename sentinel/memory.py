@@ -87,6 +87,12 @@ class Memory:
         self.db.execute("INSERT INTO holdout_log VALUES (?,?,?,?)", (now(), h, int(report["passed"]), json.dumps(report, default=float)))
         self.db.commit()
 
+    def holdout_confirmed(self, h: str) -> bool:
+        return self.db.execute("SELECT 1 FROM holdout_log WHERE hash=? AND passed=1", (h,)).fetchone() is not None
+
+    def holdout_failed(self, h: str) -> bool:
+        return self.db.execute("SELECT 1 FROM holdout_log WHERE hash=? AND passed=0", (h,)).fetchone() is not None
+
     def holdout_uses(self) -> int:
         return self.db.execute("SELECT COUNT(*) FROM holdout_log").fetchone()[0]
 

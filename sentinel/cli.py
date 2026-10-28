@@ -107,6 +107,50 @@ def cmd_status(args):
     print(f"live_trading_enabled: {risk.limits['live_trading_enabled']}")
 
 
+def cmd_confirm(args):
+    """One-shot holdout confirmation of a single pre-chosen strategy. Burns the holdout for this setup."""
+    from .strategy import describe
+    from .validation import confirm_on_holdout, split_dates
+
+    cfg, mem, risk, load = _ctx(args)
+    e = mem.get(args.hash)
+    if not e or not e["report"]:
+        sys.exit(f"unknown strategy {args.hash}")
+    if mem.holdout_uses() > 0:
+        sys.exit("refused: the holdout for this setup has already been used. It cannot honestly be used again.")
+    data = load()
+    win = {k: [str(a.date()), str(b.date())] for k, (a, b) in split_dates(data, cfg["splits"]).items()}
+    if e["report"].get("windows") != win or e["report"].get("universe") != sorted(data):
+        sys.exit("refused: the data changed since this strategy was scored, so the holdout boundary moved.\n"
+                 "Re-run research (which re-scores on current data) before confirming.")
+    print(f"Strategy {args.hash}: {describe(e['spec'])}")
+    print(f"Holdout window {win['holdout'][0]} -> {win['holdout'][1]} has never been used by any experiment.")
+    print("Pass requires ALL of: >=90% confidence the Sharpe is above zero; Sharpe >= equal-weight buy & hold;")
+    print(f"max drawdown <= {cfg['validation']['max_oos_drawdown']:.0%}; at least {cfg['validation']['min_trades_oos']} trades.")
+    print("This is ONE-TIME. Afterwards no strategy on this setup can use the holdout.")
+    if input(f"Type the strategy hash ({args.hash}) to run it: ").strip() != args.hash:
+        sys.exit("not confirmed — nothing was run")
+    rep = confirm_on_holdout(e["spec"], data, cfg)
+    mem.log_holdout(args.hash, rep)
+    m, b = rep["metrics"], rep["benchmark"]
+    print()
+    for c in rep["checks"]:
+        print(f"  {'PASS' if c['pass'] else 'FAIL'}  {c['name']:30} {c['value']}  (need {c['threshold']})")
+    print(f"  info  strategy (holdout):   sharpe {m['sharpe']:.2f}, CAGR {m['cagr']:.1%}, maxDD {m['max_drawdown']:.1%}, trades {m['n_trades']}")
+    print(f"  info  buy & hold (holdout): sharpe {b['sharpe']:.2f}, CAGR {b['cagr']:.1%}, maxDD {b['max_drawdown']:.1%}")
+    if rep["passed"]:
+        mem.set_champion("paper", args.hash, "human")
+        print(f"\nCONFIRMED. {args.hash} is now the paper strategy. Paper-trade it 4-8 weeks before considering live.")
+    else:
+        mem.event("confirm_failed", f"{args.hash} failed holdout confirmation")
+        for role in ("paper", "live"):
+            c = mem.champion(role)
+            if c and c["hash"] == args.hash:
+                mem.clear_champion(role, "failed holdout confirmation")
+                print(f"Removed {args.hash} from {role}.")
+        print("\nNOT CONFIRMED. The edge did not hold on unseen data. Do not trade this strategy.")
+
+
 def cmd_promote(args):
     from .validation import holdout_check
 
@@ -114,17 +158,27 @@ def cmd_promote(args):
     e = mem.get(args.hash)
     if not e:
         sys.exit(f"unknown strategy {args.hash}")
+    if mem.holdout_failed(args.hash):
+        sys.exit("refused: this strategy failed its holdout test on unseen data")
+    gated = bool(e["report"] and e["report"]["passed"])
+    confirmed = mem.holdout_confirmed(args.hash)
     if args.to == "paper":
-        if not e["report"] or not e["report"]["passed"]:
-            sys.exit("refused: this strategy did not pass the validation gate")
+        if not (gated or confirmed):
+            sys.exit("refused: this strategy did not pass the validation gate or a holdout confirmation")
         mem.set_champion("paper", args.hash, "human")
         print(f"paper champion -> {args.hash}")
         return
     # live
-    if not e["report"] or not e["report"]["passed"]:
-        sys.exit("refused: this strategy did not pass the validation gate")
+    if not (gated or confirmed):
+        sys.exit("refused: this strategy did not pass the validation gate or a holdout confirmation")
     if mem.champion("paper") is None or mem.champion("paper")["hash"] != args.hash:
         sys.exit("refused: promote to paper first and paper-trade it before going live")
+    if confirmed:
+        print("Holdout confirmation already passed for this strategy (holdout is not re-used).")
+        _approve_live(args, mem, risk)
+        return
+    if mem.holdout_uses() > 0:
+        sys.exit("refused: the holdout for this setup was already used by another strategy.")
     print("This runs the ONE-TIME holdout test on data the research loop has never seen.")
     print("Every holdout use is logged; repeated peeking defeats its purpose.")
     rep = holdout_check(e["spec"], load(), cfg, e["report"]["validation"]["sharpe"])
@@ -135,6 +189,10 @@ def cmd_promote(args):
         print(f"  {'PASS' if c['pass'] else 'FAIL'}  {c['name']}")
     if not rep["passed"]:
         sys.exit("refused: holdout test failed. Keep paper trading or research further.")
+    _approve_live(args, mem, risk)
+
+
+def _approve_live(args, mem, risk):
     if not risk.limits["live_trading_enabled"]:
         print("note: live_trading_enabled is false in config/risk_limits.yaml — live orders stay blocked until you change it.")
     typed = input(f"Type the strategy hash ({args.hash}) to approve it for REAL MONEY: ").strip()
@@ -212,6 +270,8 @@ def main(argv=None):
     add("status", cmd_status, "champions, trials, risk state")
     p = add("promote", cmd_promote, "promote a strategy (live requires holdout test + typed approval)")
     p.add_argument("hash"); p.add_argument("--to", choices=["paper", "live"], required=True)
+    p = add("confirm", cmd_confirm, "ONE-TIME holdout confirmation of a single pre-chosen strategy")
+    p.add_argument("hash")
     p = add("run-once", cmd_run, "one trading cycle (schedule daily after the open)")
     p.add_argument("--broker", choices=["paper", "alpaca_paper", "alpaca_live", "ticket"])
     p.add_argument("--dry-run", action="store_true")

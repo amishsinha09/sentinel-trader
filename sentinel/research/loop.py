@@ -42,7 +42,7 @@ def research(cfg: dict, data: dict, mem: Memory, agent, iterations: int, log=pri
         champ = mem.get(champ["hash"])
         for role in ("paper", "live"):
             c = mem.champion(role)
-            if c and c["hash"] == champ["hash"] and not rep["passed"]:
+            if c and c["hash"] == champ["hash"] and not rep["passed"] and not mem.holdout_confirmed(champ["hash"]):
                 msg = (f"{role} strategy {champ['hash']} no longer passes the gate on current data "
                        f"(failed: {', '.join(x['name'] for x in rep['checks'] if not x['pass'])}) — removed from {role}.")
                 mem.clear_champion(role, msg)

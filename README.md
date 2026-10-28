@@ -121,6 +121,21 @@ Included ideas: `trend_pullback` (short-term swing; rejected on both universes i
 `trend_momentum` (hold above the 200-day SMA with positive 6-month momentum, strongest first).
 A spec's optional `rank_by` term decides which signals fill the free position slots.
 
+## One-time holdout confirmation
+
+If research ends with a near-miss that failed only the Deflated Sharpe check, you may test **one**
+strategy, chosen in advance, on the never-used holdout:
+
+```bash
+python -m sentinel --settings config/settings_etf.yaml confirm <hash>
+```
+
+Pass requires all of these: at least 90% confidence the holdout Sharpe is above zero, a Sharpe at least
+equal to equal-weight buy & hold over the same years, max drawdown within limits, and enough trades.
+It runs only after you type the hash, and it can run **once per setup**: the holdout is then used up.
+A pass makes the strategy the paper strategy; live still needs paper trading plus `promote --to live`.
+A fail removes it from paper and blocks it from promotion permanently.
+
 ## Extending
 
 - **New indicator:** add one line to `INDICATORS` in `features.py` (it must use only past data) and a mapping in `pine.py`. The AI can use it on the next run.

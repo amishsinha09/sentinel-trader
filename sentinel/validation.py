@@ -90,7 +90,7 @@ def evaluate_candidate(spec: dict, data: dict, cfg: dict, n_trials: int, var_tri
         "checks": [{"name": n, "pass": bool(ok), "value": val_, "threshold": thr} for n, ok, val_, thr in checks],
         "dev": dev.metrics, "validation": m, "cost_stress": stress.metrics,
         "benchmark_validation": bench.metrics, "walk_forward": wf, "sensitivity_sharpes": sens,
-        "n_trials": n_trials, "dsr": dsr, "windows": {k: [str(a.date()), str(b.date())] for k, (a, b) in w.items()},
+        "n_trials": n_trials, "dsr": dsr, "universe": sorted(data), "windows": {k: [str(a.date()), str(b.date())] for k, (a, b) in w.items()},
     }
 
 

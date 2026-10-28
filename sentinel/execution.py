@@ -48,7 +48,7 @@ def run_once(cfg: dict, broker, mem, risk, data: dict, dry_run: bool = False, lo
     held = broker.positions()
 
     state_f = Path(cfg["state_dir"]) / f"bot_positions_{broker.name}.json"
-    owned = json.loads(state_f.read_text()) if state_f.exists() else {}
+    owned = json.loads(state_f.read_text(encoding="utf-8")) if state_f.exists() else {}
     owned = {s: v for s, v in owned.items() if s in held}  # drop positions closed at the broker (stop/target hit)
 
     sigs = {s: compute_signals(spec, df) for s, df in data.items()}
@@ -102,7 +102,7 @@ def run_once(cfg: dict, broker, mem, risk, data: dict, dry_run: bool = False, lo
             alerts.send(f"Order rejected for {s}: {res.get('error')}", "warn")
 
     if not dry_run:
-        state_f.write_text(json.dumps(owned, indent=1))
+        state_f.write_text(json.dumps(owned, indent=1), encoding="utf-8")
     acct = broker.account()
     summary = (f"{broker.name}: equity ${acct['equity']:,.0f} | entries {[e['symbol'] for e in out['entries']]} "
                f"| exits {[e['symbol'] for e in out['exits']]} | skipped {len(out['skipped'])}")

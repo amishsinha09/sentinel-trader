@@ -4,7 +4,7 @@ universe: [SPY, QQQ, AAPL, MSFT, NVDA, AMZN, META, GOOGL]
 
 data:
   source: yfinance          # synthetic (offline test) | yfinance (free) | alpaca (needs keys)
-  start: "2015-01-01"
+  start: "2005-01-01"        # longer history = more trades and a fairer statistical test
   max_staleness_days: 4     # refuse new entries if the newest bar is older than this
 
 backtest:

@@ -59,7 +59,7 @@ def load_dotenv(path: Path = ROOT / ".env") -> None:
     """Minimal .env reader (KEY=value lines). Real environment variables win."""
     if not path.exists():
         return
-    for line in path.read_text().splitlines():
+    for line in path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if line and not line.startswith("#") and "=" in line:
             k, v = line.split("=", 1)
@@ -71,7 +71,7 @@ def load_settings(path: str | os.PathLike | None = None) -> dict:
     path =Path(path or os.environ.get("SENTINEL_SETTINGS", ROOT / "config" / "settings.yaml"))
     user = {}
     if path.exists():
-        user = yaml.safe_load(path.read_text()) or {}
+        user = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     cfg = _merge(DEFAULTS, user)
     state = Path(cfg["state_dir"])
     if not state.is_absolute():

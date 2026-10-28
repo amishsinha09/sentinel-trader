@@ -64,7 +64,7 @@ python -m venv .venv && source .venv/bin/activate      # Windows: .venv\Scripts\
 pip install -r requirements.txt
 cp .env.example .env                                     # add keys later
 
-python -m unittest discover -s tests                     # 15 tests
+python -m unittest discover -s tests                     # 16 tests
 python -m sentinel --source synthetic research --iterations 5   # offline dry run
 rm -rf state                                             # wipe the dry-run memory
 ```

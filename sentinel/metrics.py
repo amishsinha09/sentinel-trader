@@ -28,8 +28,9 @@ def perf_metrics(equity: pd.Series, trades: pd.DataFrame | None = None, periods:
     m["total_return"] = total
     m["cagr"] = float((1 + total) ** (1 / years) - 1) if years > 0 and total > -1 else 0.0
     m["calmar"] = m["cagr"] / m["max_drawdown"] if m["max_drawdown"] > 0 else 0.0
-    m["skew"] = float(r.skew()) if len(r) > 2 else 0.0
-    m["kurtosis"] = float(r.kurt() + 3) if len(r) > 3 else 3.0
+    skew, kurt = (float(r.skew()) if len(r) > 2 else 0.0), (float(r.kurt() + 3) if len(r) > 3 else 3.0)
+    m["skew"] = skew if math.isfinite(skew) else 0.0          # flat equity (no trades) gives NaN
+    m["kurtosis"] = kurt if math.isfinite(kurt) else 3.0
     t = trades if trades is not None else pd.DataFrame()
     m["n_trades"] = int(len(t))
     if len(t):
@@ -45,7 +46,7 @@ def perf_metrics(equity: pd.Series, trades: pd.DataFrame | None = None, periods:
 
 def probabilistic_sharpe(sr: float, sr_star: float, T: int, skew: float, kurt: float) -> float:
     """P(true per-period Sharpe > sr_star) given an observed per-period Sharpe sr over T obs."""
-    if T < 3:
+    if T < 3 or sr == 0 or not all(math.isfinite(x) for x in (sr, sr_star, skew, kurt)):
         return 0.0
     denom = 1 - skew * sr + (kurt - 1) / 4 * sr ** 2
     if denom <= 0:

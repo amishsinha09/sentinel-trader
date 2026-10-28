@@ -9,7 +9,7 @@ from ..alerts import Alerts
 from ..config import resolve
 from ..memory import Memory
 from ..strategy import SpecError, spec_hash, validate_spec
-from ..validation import evaluate_candidate
+from ..validation import evaluate_candidate, split_dates
 from .diagnose import diagnose
 
 
@@ -17,7 +17,7 @@ def ensure_baseline(cfg: dict, data: dict, mem: Memory, log=print) -> dict:
     champ = mem.champion("research")
     if champ:
         return champ
-    spec = validate_spec(json.loads(resolve(cfg["research"]["baseline_spec"]).read_text()))
+    spec = validate_spec(json.loads(resolve(cfg["research"]["baseline_spec"]).read_text(encoding="utf-8")))
     h = spec_hash(spec)
     if not mem.exists(h):
         rep = evaluate_candidate(spec, data, cfg, mem.trial_count() + 1, mem.trial_sr_var())
@@ -33,6 +33,13 @@ def ensure_baseline(cfg: dict, data: dict, mem: Memory, log=print) -> dict:
 def research(cfg: dict, data: dict, mem: Memory, agent, iterations: int, log=print) -> list[dict]:
     alerts = Alerts(cfg)
     champ = ensure_baseline(cfg, data, mem, log)
+    windows = {k: [str(a.date()), str(b.date())] for k, (a, b) in split_dates(data, cfg["splits"]).items()}
+    if (champ["report"] or {}).get("windows") != windows or champ["report"].get("universe") != sorted(data):
+        log("data changed since the champion was scored — re-evaluating it on the current data")
+        rep = evaluate_candidate(champ["spec"], data, cfg, mem.trial_count(), mem.trial_sr_var())
+        mem.record(champ["hash"], champ["spec"], rep, champ["status"], champ["hypothesis"], champ["agent"],
+                   champ["parent"], [c["name"] for c in rep["checks"] if not c["pass"]])
+        champ = mem.get(champ["hash"])
     results = []
     for it in range(1, iterations + 1):
         diag = diagnose(champ["spec"], data, cfg)

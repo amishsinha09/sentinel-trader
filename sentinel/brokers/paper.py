@@ -15,11 +15,11 @@ class PaperBroker(Broker):
         bt = cfg["backtest"]
         self.cost = CostModel(bt["commission_per_share"], bt["spread_bps"], bt["slippage_bps"])
         self.file = Path(cfg["state_dir"]) / "paper_account.json"
-        self.s = json.loads(self.file.read_text()) if self.file.exists() else {
+        self.s = json.loads(self.file.read_text(encoding="utf-8")) if self.file.exists() else {
             "cash": bt["initial_capital"], "positions": {}, "prices": {}, "fills": []}
 
     def _save(self):
-        self.file.write_text(json.dumps(self.s, indent=1))
+        self.file.write_text(json.dumps(self.s, indent=1), encoding="utf-8")
 
     def set_prices(self, bars: dict):
         """bars: {symbol: {"high","low","close"}} from the latest daily bar. Triggers stops/targets."""

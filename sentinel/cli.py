@@ -22,11 +22,11 @@ def _ctx(args):
 
 def _spec_from(args, mem, cfg):
     if getattr(args, "spec", None):
-        return json.loads(resolve(args.spec).read_text())
+        return json.loads(resolve(args.spec).read_text(encoding="utf-8"))
     c = mem.champion(getattr(args, "role", "paper")) or mem.champion("research")
     if c:
         return c["spec"]
-    return json.loads(resolve(cfg["research"]["baseline_spec"]).read_text())
+    return json.loads(resolve(cfg["research"]["baseline_spec"]).read_text(encoding="utf-8"))
 
 
 def cmd_backtest(args):
@@ -152,7 +152,7 @@ def cmd_pine(args):
     cfg, mem, _, _ = _ctx(args)
     spec = _spec_from(args, mem, cfg)
     out = Path(args.out or f"sentinel_{spec_hash(spec)}.pine")
-    out.write_text(to_pine(spec, cfg["backtest"], spec_hash(spec)))
+    out.write_text(to_pine(spec, cfg["backtest"], spec_hash(spec)), encoding="utf-8")
     print(f"wrote {out}")
 
 

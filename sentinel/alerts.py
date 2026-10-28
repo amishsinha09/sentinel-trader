@@ -15,7 +15,7 @@ class Alerts:
 
     def send(self, message: str, level: str = "info") -> None:
         line = f"{datetime.now().isoformat(timespec='seconds')} [{level.upper()}] {message}"
-        with self.log.open("a") as f:
+        with self.log.open("a", encoding="utf-8") as f:
             f.write(line + "\n")
         if not self.url:
             return
@@ -24,5 +24,5 @@ class Alerts:
             req = urllib.request.Request(self.url, body.encode(), {"Content-Type": "application/json"})
             urllib.request.urlopen(req, timeout=10).read()
         except Exception as e:  # alerting must never crash trading
-            with self.log.open("a") as f:
+            with self.log.open("a", encoding="utf-8") as f:
                 f.write(f"  (webhook failed: {e})\n")

@@ -58,5 +58,5 @@ halted {rs.get('halted', False)} {html.escape(rs.get('halt_reason', ''))} · tri
 <h2>Experiments</h2><div class="scroll"><table><tr><th>hash</th><th>status</th><th>OOS Sharpe</th><th>OOS DD</th><th>DSR</th><th>hypothesis</th><th>failed checks</th></tr>
 {''.join(rows)}</table></div></body></html>"""
     p = Path(out_path)
-    p.write_text(page)
+    p.write_text(page, encoding="utf-8")
     return p

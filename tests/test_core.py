@@ -17,7 +17,7 @@ from sentinel.pine import to_pine
 from sentinel.risk import RiskEngine
 from sentinel.strategy import SpecError, compute_signals, spec_hash, validate_spec
 
-BASE = json.loads((ROOT / "strategies/baseline_trend_pullback.json").read_text())
+BASE = json.loads((ROOT / "strategies/baseline_trend_pullback.json").read_text(encoding="utf-8"))
 
 
 class TestStrategy(unittest.TestCase):
@@ -71,6 +71,14 @@ class TestMetrics(unittest.TestCase):
         a = deflated_sharpe(0.08, 500, 0, 3, 1, 0.001)
         b = deflated_sharpe(0.08, 500, 0, 3, 200, 0.001)
         self.assertGreater(a, b)
+
+
+    def test_no_trades_no_nan(self):
+        from sentinel.metrics import perf_metrics
+        eq = pd.Series(100000.0, index=pd.bdate_range("2020-01-01", periods=300))
+        m = perf_metrics(eq)
+        d = deflated_sharpe(m["sr_period"], m["n_days"], m["skew"], m["kurtosis"], 10, 0.001)
+        self.assertEqual(d, 0.0)
 
 
 class TestRisk(unittest.TestCase):

@@ -23,7 +23,7 @@ class TicketBroker(Broker):
 
     def _read(self, name, default):
         f = self.dir / name
-        return json.loads(f.read_text()) if f.exists() else default
+        return json.loads(f.read_text(encoding="utf-8")) if f.exists() else default
 
     def account(self):
         a = self._read("account.json", {"equity": self.default_equity, "cash": self.default_equity})
@@ -36,7 +36,7 @@ class TicketBroker(Broker):
     def _ticket(self, body: dict) -> dict:
         ts = datetime.now().strftime("%Y%m%d-%H%M%S")
         f = self.dir / f"{ts}-{body['action']}-{body.get('symbol', body.get('underlying', 'x'))}.json"
-        f.write_text(json.dumps(body, indent=1, default=str))
+        f.write_text(json.dumps(body, indent=1, default=str), encoding="utf-8")
         return {"ok": True, "id": f.name, "fill_price": body.get("ref_price")}
 
     def buy_bracket(self, symbol, qty, ref_price, stop, target):

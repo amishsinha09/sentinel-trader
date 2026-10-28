@@ -29,18 +29,18 @@ class RiskEngine:
         self.state_dir = Path(state_dir)
         self.kill_file = self.state_dir / "KILL"
         self.state_file = self.state_dir / "risk_state.json"
-        self.state = json.loads(self.state_file.read_text()) if self.state_file.exists() else {}
+        self.state = json.loads(self.state_file.read_text(encoding="utf-8")) if self.state_file.exists() else {}
 
     # state ---------------------------------------------------------------
     def _save(self):
-        self.state_file.write_text(json.dumps(self.state, indent=1))
+        self.state_file.write_text(json.dumps(self.state, indent=1), encoding="utf-8")
 
     @property
     def killed(self) -> bool:
         return self.kill_file.exists()
 
     def kill(self, reason: str):
-        self.kill_file.write_text(reason)
+        self.kill_file.write_text(reason, encoding="utf-8")
 
     def unkill(self):
         self.kill_file.unlink(missing_ok=True)

@@ -73,6 +73,11 @@ class Memory:
         self.db.commit()
         self.event("champion", f"{role} champion -> {h}", {"approved_by": approved_by})
 
+    def clear_champion(self, role: str, reason: str):
+        self.db.execute("DELETE FROM champions WHERE role=?", (role,))
+        self.db.commit()
+        self.event("champion", f"{role} champion removed: {reason}")
+
     def champion(self, role: str) -> dict | None:
         r = self.db.execute("SELECT hash FROM champions WHERE role=?", (role,)).fetchone()
         return self.get(r["hash"]) if r else None

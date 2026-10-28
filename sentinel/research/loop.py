@@ -40,22 +40,46 @@ def research(cfg: dict, data: dict, mem: Memory, agent, iterations: int, log=pri
         mem.record(champ["hash"], champ["spec"], rep, champ["status"], champ["hypothesis"], champ["agent"],
                    champ["parent"], [c["name"] for c in rep["checks"] if not c["pass"]])
         champ = mem.get(champ["hash"])
+        for role in ("paper", "live"):
+            c = mem.champion(role)
+            if c and c["hash"] == champ["hash"] and not rep["passed"]:
+                msg = (f"{role} strategy {champ['hash']} no longer passes the gate on current data "
+                       f"(failed: {', '.join(x['name'] for x in rep['checks'] if not x['pass'])}) — removed from {role}.")
+                mem.clear_champion(role, msg)
+                alerts.send(msg, "warn")
+                log(msg)
+    bench = champ["report"].get("benchmark_validation", {}).get("sharpe")
+    if bench is not None:
+        log(f"champion {champ['hash']}: OOS sharpe {champ['report']['validation']['sharpe']:.2f} | "
+            f"equal-weight buy & hold, same window: {bench:.2f}")
+
+    def fresh(e):
+        r = (e or {}).get("report") or {}
+        return r.get("windows") == windows and r.get("universe") == sorted(data)
+
     results = []
     for it in range(1, iterations + 1):
         diag = diagnose(champ["spec"], data, cfg)
+        history = [e for e in mem.recent(200) if fresh(e)][:20]
         try:
-            prop = agent.propose(champ["spec"], diag, mem.recent(20))
+            prop = agent.propose(champ["spec"], diag, history)
+            if prop is None:
+                log(f"[{it}] {agent.name} agent has no untested ideas left. Add ANTHROPIC_API_KEY for the Claude "
+                    "researcher, or write a new baseline idea in strategies/.")
+                break
             spec = validate_spec(prop["spec"])
         except SpecError as e:
             log(f"[{it}] invalid proposal: {e}")
             mem.event("invalid_proposal", str(e))
             continue
         h = spec_hash(spec)
-        if mem.exists(h):
+        if mem.exists(h) and fresh(mem.get(h)):
             log(f"[{it}] duplicate of {h}, skipped (not counted)")
             continue
+        retest = mem.exists(h)  # tested before on older data: re-score, but it is not a new trial
+        n_trials = mem.trial_count() + (0 if retest else 1)
         spec["parent"] = champ["hash"]
-        rep = evaluate_candidate(spec, data, cfg, mem.trial_count() + 1, mem.trial_sr_var())
+        rep = evaluate_candidate(spec, data, cfg, n_trials, mem.trial_sr_var())
         cv, nv = champ["report"]["validation"], rep["validation"]
         min_imp = cfg["validation"]["min_improvement_sharpe"]
         improved = nv["sharpe"] >= cv["sharpe"] + min_imp and nv["max_drawdown"] <= cv["max_drawdown"] * 1.2 + 0.02

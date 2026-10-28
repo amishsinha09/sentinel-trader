@@ -58,6 +58,8 @@ def cmd_validate(args):
         mem.record(spec_hash(spec), spec, rep, "manual_validate", "manual validation", "human", reasons=failed)
     for c in rep["checks"]:
         print(f"  {'PASS' if c['pass'] else 'FAIL'}  {c['name']:26} {c['value']}  (need {c['threshold']})")
+    b = rep["benchmark_validation"]
+    print(f"  info  buy & hold (same window): sharpe {b['sharpe']:.2f}, maxDD {b['max_drawdown']:.1%}")
     print("GATE:", "PASSED" if rep["passed"] else "FAILED")
 
 

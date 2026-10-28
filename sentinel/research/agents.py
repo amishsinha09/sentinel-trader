@@ -114,21 +114,14 @@ class MutationAgent:
             s = copy.deepcopy(s0)
             s["params"]["target_atr"] = round(max(s["params"]["target_atr"] * 0.8, 0.5), 2)
             ideas.append((s, f"Many trades time out; bring target in to {s['params']['target_atr']}xATR."))
-        if len(s0["entry"]["all"]) > 2:
-            s = copy.deepcopy(s0)
-            i = self.rng.randrange(len(s["entry"]["all"]))
-            dropped = s["entry"]["all"].pop(i)
-            ideas.append((s, f"Simplify: drop entry condition {dropped['left']} {dropped['op']} {dropped['right']}."))
-        # always have a fallback: nudge one parameter
-        s = copy.deepcopy(s0)
-        k = self.rng.choice(list(s["params"]))
-        v = s["params"][k]
-        f = self.rng.choice([0.8, 1.25])
-        s["params"][k] = int(round(v * f)) if isinstance(v, int) else round(v * f, 2)
-        fallback = (s, f"Robustness probe: {k} {v} -> {s['params'][k]}.")
-
+        if len(s0["entry"]["all"]) > 1:
+            for i in range(len(s0["entry"]["all"])):
+                s = copy.deepcopy(s0)
+                dropped = s["entry"]["all"].pop(i)
+                ideas.append((s, f"Simplify: drop entry condition {dropped['left']} {dropped['op']} {dropped['right']}."))
+        # No random parameter nudges: those are curve-fitting, burn the trial budget and are
+        # already covered by the gate's parameter-robustness check.
         self.rng.shuffle(ideas)
-        ideas.append(fallback)
         for s, why in ideas:
             try:
                 s = validate_spec(s)
@@ -136,7 +129,7 @@ class MutationAgent:
                 continue
             if spec_hash(s) not in tried:
                 return {"spec": s, "hypothesis": why}
-        return {"spec": validate_spec(ideas[-1][0]), "hypothesis": ideas[-1][1]}
+        return None  # out of ideas
 
 
 def make_agent(cfg: dict, seed: int = 0):

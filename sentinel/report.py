@@ -23,9 +23,12 @@ def _svg(series_list, w=720, h=220):
 def build_report(cfg, data, mem, risk, out_path) -> Path:
     w = split_dates(data, cfg["splits"])
     rows, champ_html = [], ""
+    win = {k: [str(a.date()), str(b.date())] for k, (a, b) in w.items()}
     for e in mem.recent(60):
         v = (e["report"] or {}).get("validation", {})
-        rows.append(f"<tr class='{e['status']}'><td><code>{e['hash']}</code></td><td>{e['status']}</td>"
+        old = (e["report"] or {}).get("windows") != win or (e["report"] or {}).get("universe") != sorted(data)
+        tag = " <span class='k'>(older data)</span>" if old else ""
+        rows.append(f"<tr class='{e['status']}'><td><code>{e['hash']}</code>{tag}</td><td>{e['status']}</td>"
                     f"<td>{v.get('sharpe', 0):.2f}</td><td>{v.get('max_drawdown', 0):.1%}</td>"
                     f"<td>{(e['report'] or {}).get('dsr', 0):.2f}</td><td>{html.escape(e['hypothesis'] or '')[:160]}</td>"
                     f"<td>{html.escape(', '.join(e['reasons'] or []))}</td></tr>")
@@ -41,7 +44,12 @@ def build_report(cfg, data, mem, risk, out_path) -> Path:
                       f"<p>Research-period equity: <span style='color:var(--a)'>strategy</span> vs "
                       f"<span style='color:var(--m)'>equal-weight buy &amp; hold</span>. Holdout not shown.</p>"
                       f"{_svg([(bh.equity, 'var(--m)', 'buy & hold'), (res.equity, 'var(--a)', 'strategy')])}"
-                      f"<h3>Validation gate</h3><ul>{checks}</ul>")
+                      f"<h3>Validation gate</h3><ul>{checks}</ul>"
+                      f"<p class='k'>For reference (not a gate check): out-of-sample Sharpe "
+                      f"{champ['report']['validation']['sharpe']:.2f} vs equal-weight buy &amp; hold "
+                      f"{champ['report'].get('benchmark_validation', {}).get('sharpe', float('nan')):.2f}, "
+                      f"max drawdown {champ['report']['validation']['max_drawdown']:.1%} vs "
+                      f"{champ['report'].get('benchmark_validation', {}).get('max_drawdown', float('nan')):.1%}.</p>")
     roles_html = "".join(f"<li><b>{r}</b>: {('<code>' + c['hash'] + '</code>') if c else '—'}</li>" for r, c in roles.items())
     rs = risk.state
     page = f"""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">

@@ -11,15 +11,15 @@ from .base import Broker
 
 class AlpacaBroker(Broker):
     def __init__(self, paper: bool = True):
-        if not os.environ.get("ALPACA_API_KEY") or not os.environ.get("ALPACA_SECRET_KEY"):
-            raise SystemExit("Alpaca keys missing: put ALPACA_API_KEY and ALPACA_SECRET_KEY in .env "
-                             f"({'paper' if paper else 'LIVE'} account keys).")
+        kv, sv = ("ALPACA_API_KEY", "ALPACA_SECRET_KEY") if paper else ("ALPACA_LIVE_API_KEY", "ALPACA_LIVE_SECRET_KEY")
+        if not os.environ.get(kv) or not os.environ.get(sv):
+            raise SystemExit(f"Alpaca {'paper' if paper else 'LIVE'} keys missing: put {kv} and {sv} in .env")
         from alpaca.trading.client import TradingClient
 
         self.paper = paper
         self.live = not paper
         self.name = "alpaca_paper" if paper else "alpaca_live"
-        key, secret = os.environ["ALPACA_API_KEY"], os.environ["ALPACA_SECRET_KEY"]
+        key, secret = os.environ[kv], os.environ[sv]
         self.client = TradingClient(key, secret, paper=paper)
         self._key, self._secret = key, secret
 

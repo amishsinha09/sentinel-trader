@@ -57,6 +57,11 @@ def _setup_name(universe: list[str]) -> str:
 
 
 def _verdict(mem, roles, holdouts, current) -> tuple[str, str, str]:
+    if roles["live"] and (mem.approved_by("live") or "").startswith("override"):
+        meta = mem.approved_by("live").split(":", 1)[-1].strip()
+        return "liveov", "LIVE (override): real money", \
+            (f"Strategy {roles['live']['hash']} did NOT pass the safety checks and is trading real money by owner "
+             f"override ({meta}). Evidence suggests it will earn less than simply holding the same ETFs.")
     if roles["live"]:
         return "live", "LIVE — trading real money", f"Strategy {roles['live']['hash']} is approved for real money."
     if roles["paper"] and mem.is_override("paper"):
@@ -92,7 +97,7 @@ def build_report(cfg, data, mem, risk, out_path, recent: dict | None = None) -> 
         try:
             parts += trading_view.sections(cfg, mem, current["spec"], recent or data,
                                            approved=bool(roles["paper"] or roles["live"]),
-                                           broker_name=cfg["execution"]["broker"])
+                                           broker_name="alpaca_live" if roles["live"] else cfg["execution"]["broker"])
         except Exception as e:  # the research report must still render if fresh prices are unavailable
             parts.append(f"<section><p class='k'>Trading view unavailable: {E(str(e))}</p></section>")
     parts.append("<h2 class='divider'>Research results</h2>")
@@ -212,7 +217,7 @@ h1{{font-size:28px;margin:2px 0}}h2{{font-size:20px;margin:0 0 8px}}section{{mar
 .sub,.k{{color:var(--mut)}}.k{{font-size:14px}}code{{font-size:13px}}
 .verdict{{border-radius:12px;padding:18px 20px;border:1px solid var(--line)}}.verdict h2{{font-size:24px;margin:4px 0}}
 .verdict.stop{{background:var(--badbg)}}.verdict.stop h2{{color:var(--bad)}}.verdict.paper{{background:var(--warnbg)}}.verdict.paper h2{{color:var(--warn)}}
-.verdict.live{{background:var(--okbg)}}.verdict.live h2{{color:var(--ok)}}
+.verdict.live{{background:var(--okbg)}}.verdict.live h2{{color:var(--ok)}}.verdict.liveov{{background:var(--badbg);border-color:var(--bad)}}.verdict.liveov h2{{color:var(--bad)}}
 .cards{{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin:12px 0}}
 .card{{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}}.card ul{{margin:8px 0 0;padding-left:20px}}
 .big{{font-size:30px;font-weight:650;margin:4px 0}}.chart{{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}}

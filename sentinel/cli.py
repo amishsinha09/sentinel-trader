@@ -160,8 +160,9 @@ def cmd_promote(args):
         sys.exit(f"unknown strategy {args.hash}")
     gated = bool(e["report"] and e["report"]["passed"])
     confirmed = mem.holdout_confirmed(args.hash)
-    if args.override and args.to != "paper":
-        sys.exit("refused: --override works for paper trading only. Real money always needs every check passed.")
+    if args.override and args.to == "live":
+        _live_override(args, cfg, mem, risk, e)
+        return
     if args.to == "paper" and args.override:
         if gated or confirmed:
             sys.exit("no override needed: this strategy is approved; run without --override")
@@ -211,6 +212,49 @@ def cmd_promote(args):
     _approve_live(args, mem, risk)
 
 
+def _live_override(args, cfg, mem, risk, e):
+    """Real money for a strategy that did NOT pass the checks. Owner's decision, with hard guardrails."""
+    import json as _json
+
+    h = args.hash
+    reason = (args.reason or "").strip()
+    if not reason:
+        sys.exit('add --reason "..." (logged)')
+    if mem.holdout_failed(h):
+        sys.exit("refused: this strategy failed its final exam on never-seen data; it cannot go live, even by override")
+    if (mem.champion("paper") or {}).get("hash") != h:
+        sys.exit("refused: make it the paper strategy first (promote --to paper [--override])")
+    runs = [_json.loads(d) for (d,) in mem.db.execute("SELECT data FROM events WHERE kind='run' ORDER BY ts")]
+    ok_runs = [r for r in runs if r.get("broker") in ("alpaca_paper", "paper") and r.get("strategy") == h
+               and all(x.get("ok", True) for x in r.get("entries", []) + r.get("exits", []))]
+    if not ok_runs:
+        sys.exit("refused: needs at least one successful PAPER run of this strategy first:\n"
+                 "  python -m sentinel --settings <profile> run-once --broker alpaca_paper   (or --broker paper)")
+    cap = risk.limits.get("live_capital_cap")
+    if not cap:
+        sys.exit("refused: set live_capital_cap in config/risk_limits.yaml first")
+    v, b = e["report"]["validation"], e["report"].get("benchmark_validation", {})
+    failed = [c["name"] for c in e["report"]["checks"] if not c["pass"]]
+    print("=" * 72)
+    print(f"LIVE OVERRIDE for {h}: REAL MONEY, strategy did NOT pass the safety checks.")
+    print(f"  failed checks: {', '.join(failed)}")
+    print(f"  test years: strategy {v['cagr']:.1%}/yr, worst drop {v['max_drawdown']:.0%}; "
+          f"buy & hold {b.get('cagr', 0):.1%}/yr, worst drop {b.get('max_drawdown', 0):.0%}")
+    print(f"  trades are sized as if the account held at most ${float(cap):,.0f} (live_capital_cap)")
+    print("  hard limits stay on: 1% risk/trade, daily-loss halt, drawdown halt, kill switch")
+    print("  expected outcome from the evidence: less return than simply holding the same ETFs")
+    print("=" * 72)
+    if input(f"Type the strategy hash ({h}): ").strip() != h:
+        sys.exit("not confirmed")
+    if input('Type "I ACCEPT THE RISK": ').strip() != "I ACCEPT THE RISK":
+        sys.exit("not confirmed")
+    mem.set_champion("live", h, f"override-live: {reason}; cap=${float(cap):,.0f}")
+    mem.event("live_override", f"{h}: {reason}", {"cap": cap, "failed_checks": failed})
+    print(f"live strategy -> {h} (override, capped at ${float(cap):,.0f})")
+    if not risk.limits["live_trading_enabled"]:
+        print("Final step, by hand: set live_trading_enabled: true in config/risk_limits.yaml")
+
+
 def _approve_live(args, mem, risk):
     if not risk.limits["live_trading_enabled"]:
         print("note: live_trading_enabled is false in config/risk_limits.yaml — live orders stay blocked until you change it.")
@@ -229,6 +273,8 @@ def cmd_run(args):
     if args.broker:
         cfg["execution"]["broker"] = args.broker
     broker = make_broker(cfg)
+    from .risk import RiskEngine
+    risk = RiskEngine(cfg["state_dir"], scope=broker.name)  # separate loss/drawdown tracking per account
     if broker.live:
         print("*** LIVE BROKER — real money ***")
     from .data import load_recent
@@ -299,7 +345,7 @@ def main(argv=None):
     add("status", cmd_status, "champions, trials, risk state")
     p = add("promote", cmd_promote, "promote a strategy (live requires holdout test + typed approval)")
     p.add_argument("hash"); p.add_argument("--to", choices=["paper", "live"], required=True)
-    p.add_argument("--override", action="store_true", help="paper only: paper-trade a strategy that failed the checks")
+    p.add_argument("--override", action="store_true", help="trade a strategy that failed the checks (paper, or capped live)")
     p.add_argument("--reason", help="why (required with --override; logged)")
     p = add("confirm", cmd_confirm, "ONE-TIME holdout confirmation of a single pre-chosen strategy")
     p.add_argument("hash")

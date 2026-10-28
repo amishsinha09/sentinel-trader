@@ -3,6 +3,7 @@
 # Exits (risk-reducing orders) are always allowed, even when trading is halted.
 
 live_trading_enabled: false     # must be true (and a strategy promoted with --to live) for real money
+live_capital_cap: 1000          # live trades are sized as if the account held at most this many dollars
 
 max_risk_per_trade_pct: 1.0     # loss at stop, as % of equity
 max_position_pct: 20.0          # notional per position, % of equity

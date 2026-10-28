@@ -46,6 +46,11 @@ def run_once(cfg: dict, broker, mem, risk, data: dict, dry_run: bool = False, lo
             out["exits"].append(ev)
 
     acct = broker.account()
+    size_eq = acct["equity"]
+    cap = risk.limits.get("live_capital_cap")
+    if broker.live and cap:
+        size_eq = min(acct["equity"], float(cap))
+        log(f"LIVE: sizing trades on ${size_eq:,.0f} (account ${acct['equity']:,.0f}, cap ${float(cap):,.0f})")
     for msg in risk.update_equity(acct["equity"]):
         alerts.send(msg, "critical")
     held = broker.positions()
@@ -86,15 +91,15 @@ def run_once(cfg: dict, broker, mem, risk, data: dict, dry_run: bool = False, lo
         if not math.isfinite(a) or a <= 0:
             continue
         stop, target = ref - p["stop_atr"] * a, ref + p["target_atr"] * a
-        want = math.floor(acct["equity"] * bt["risk_per_trade"] / (p["stop_atr"] * a))
-        dec = risk.check_entry(symbol=s, qty=want, price=ref, stop=stop, equity=acct["equity"], positions=held,
+        want = math.floor(size_eq * bt["risk_per_trade"] / (p["stop_atr"] * a))
+        dec = risk.check_entry(symbol=s, qty=want, price=ref, stop=stop, equity=size_eq, positions=held,
                                live=broker.live, market_open=broker.market_open(), spread_bps=spread,
                                gross_exposure=gross)
         if not dec.approved:
             out["skipped"].append({"symbol": s, "reasons": dec.reasons})
             continue
         if cfg["execution"]["options_enabled"]:
-            out["options"].append(_options_leg(s, df, broker, risk, acct, cfg, dry_run))
+            out["options"].append(_options_leg(s, df, broker, risk, {**acct, "equity": size_eq}, cfg, dry_run))
             continue
         res = {"ok": True, "dry_run": True, "fill_price": ref} if dry_run else broker.buy_bracket(s, dec.qty, ref, stop, target)
         cb = risk.record_result(res.get("ok", False))

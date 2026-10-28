@@ -146,6 +146,11 @@ Paste the file into the Pine Editor → *Add to chart* → *Strategy Tester*. En
 
 ## Robinhood
 
+Daily flow: run `python -m sentinel --settings config/settings_etf.yaml run-once --broker ticket`, paste the
+`TICKET` lines into Claude, and approve each order Claude places through the Robinhood connector. Then update
+`state_etf/tickets/positions.json` and `account.json` so the bot knows what you hold. Robinhood can't hold a
+stop-loss and a profit target on the same shares, so only the stop-loss is placed.
+
 Robinhood has no public stock-trading API for bots. Use `execution.broker: ticket`. Tickets are treated as **real money**: they need a live-approved strategy and `live_trading_enabled: true`. Each run writes risk-checked order tickets (entry, stop, target) to `state/tickets/`. You place them yourself, or ask Claude to place them through your Robinhood connector with trade approval on.
 
 ## Options

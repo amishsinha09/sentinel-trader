@@ -30,11 +30,13 @@ def _avg_lines(spec: dict) -> list[tuple[str, int]]:
     return out[:3]
 
 
-def _trades_from_runs(mem) -> tuple[list, list]:
+def _trades_from_runs(mem, broker: str) -> tuple[list, list]:
     """(equity points, trade markers) from the logged daily runs."""
     eq, marks = [], []
     for ts, data in mem.db.execute("SELECT ts, data FROM events WHERE kind='run' ORDER BY ts"):
         d = json.loads(data or "{}")
+        if d.get("broker") != broker:
+            continue
         day = pd.Timestamp(ts[:10])
         if d.get("equity") is not None:
             eq.append((day, float(d["equity"])))
@@ -47,9 +49,12 @@ def _trades_from_runs(mem) -> tuple[list, list]:
     return eq, marks
 
 
-def _latest_positions(mem) -> dict:
-    r = mem.db.execute("SELECT data FROM events WHERE kind='run' ORDER BY ts DESC LIMIT 1").fetchone()
-    return json.loads(r[0]).get("positions", {}) if r else {}
+def _latest_positions(mem, broker: str) -> dict:
+    for (d,) in mem.db.execute("SELECT data FROM events WHERE kind='run' ORDER BY ts DESC"):
+        d = json.loads(d or "{}")
+        if d.get("broker") == broker:
+            return d.get("positions", {})
+    return {}
 
 
 def _price_svg(df: pd.DataFrame, lines: list, marks: list, w=460, h=200) -> str:
@@ -112,8 +117,8 @@ def _equity_svg(points: list, w=760, h=200) -> str:
 def sections(cfg: dict, mem, spec: dict, recent: dict, approved: bool, broker_name: str) -> list[str]:
     spec = validate_spec(spec)
     p = spec["params"]
-    positions = _latest_positions(mem)
-    eq, marks = _trades_from_runs(mem)
+    positions = _latest_positions(mem, broker_name)
+    eq, marks = _trades_from_runs(mem, broker_name)
     parts = []
 
     # ── Account ─────────────────────────────────────────────────────────

@@ -21,14 +21,15 @@ class RiskDecision:
 
 
 class RiskEngine:
-    def __init__(self, state_dir: str, limits_path: str = "config/risk_limits.yaml"):
+    def __init__(self, state_dir: str, limits_path: str = "config/risk_limits.yaml", scope: str | None = None):
         p = resolve(limits_path)
         raw = p.read_bytes()
         self.limits = yaml.safe_load(raw)
         self.limits_sha = hashlib.sha256(raw).hexdigest()[:12]
         self.state_dir = Path(state_dir)
         self.kill_file = self.state_dir / "KILL"
-        self.state_file = self.state_dir / "risk_state.json"
+        # each broker account (paper, live) tracks its own daily loss / drawdown; the kill switch is shared
+        self.state_file = self.state_dir / (f"risk_state_{scope}.json" if scope else "risk_state.json")
         self.state = json.loads(self.state_file.read_text(encoding="utf-8")) if self.state_file.exists() else {}
 
     # state ---------------------------------------------------------------

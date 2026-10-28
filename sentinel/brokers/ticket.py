@@ -38,12 +38,13 @@ class TicketBroker(Broker):
         ts = datetime.now().strftime("%Y%m%d-%H%M%S")
         f = self.dir / f"{ts}-{body['action']}-{body.get('symbol', body.get('underlying', 'x'))}.json"
         f.write_text(json.dumps(body, indent=1, default=str), encoding="utf-8")
+        print(f"TICKET {f.name}: " + json.dumps({k: v for k, v in body.items() if k != "instructions"}, default=str))
         return {"ok": True, "id": f.name, "fill_price": body.get("ref_price")}
 
     def buy_bracket(self, symbol, qty, ref_price, stop, target):
         return self._ticket({"action": "BUY", "symbol": symbol, "qty": qty, "ref_price": round(ref_price, 2),
                              "stop_loss": round(stop, 2), "take_profit": round(target, 2),
-                             "instructions": "Buy at market; then place a GTC stop and a GTC limit (OCO if available)."})
+                             "instructions": "Buy at market; then place a GTC stop-loss sell at stop_loss for the same shares."})
 
     def close(self, symbol):
         return self._ticket({"action": "SELL", "symbol": symbol, "instructions": "Cancel resting orders, sell entire position."})

@@ -180,3 +180,50 @@ class TestPine(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestLivePlan(unittest.TestCase):
+    def setUp(self):
+        from sentinel.live_plan import signals_table
+        self.cfg = load_settings("config/settings_etf.yaml")
+        spec = json.loads((ROOT / "strategies/trend_momentum.json").read_text(encoding="utf-8"))
+        self.sig = signals_table(spec, synthetic(self.cfg["universe"], "2018-01-01"))
+        self.today = date.fromisoformat(self.sig["as_of"])
+
+    def plan(self, **acct):
+        from sentinel.live_plan import make_plan
+        a = {"value": 1000.0, "cash": 1000.0, "positions": {}, "stops": {}, "open_buys": []}
+        a.update(acct)
+        return make_plan(self.sig, a, self.cfg, cap=1000, peak=1000, today=self.today)
+
+    def test_sizing_respects_caps(self):
+        p = self.plan()
+        for b in p["buys"]:
+            self.assertLessEqual(b["qty"] * b["ref_close"], 1000 * 0.20 + 1e-6)   # 20% per position
+            self.assertLessEqual(b["risk_at_stop"], 1000 * 0.01 + 1e-6)          # 1% risk
+        self.assertLessEqual(len(p["buys"]), 5)
+        self.assertGreaterEqual(p["sizing"]["cash_after_buys"], 0)
+
+    def test_cap_limits_big_accounts(self):
+        a, b = self.plan(), self.plan(value=50000.0, cash=50000.0)
+        self.assertEqual([x["qty"] for x in a["buys"]], [x["qty"] for x in b["buys"]])
+
+    def test_drawdown_halts_buys_but_not_sells(self):
+        held = next(s for s, r in self.sig["symbols"].items() if r["exit"]) if any(
+            r["exit"] for r in self.sig["symbols"].values()) else None
+        pos = {held: {"qty": 1, "avg_price": 10}} if held else {}
+        p = self.plan(value=800.0, cash=800.0, positions=pos)
+        self.assertTrue(p["halts"]); self.assertFalse(p["buys"])
+        if held:
+            self.assertEqual(p["sells"][0]["symbol"], held)
+
+    def test_missing_stop_is_flagged(self):
+        s = next(iter(self.sig["symbols"]))
+        p = self.plan(positions={s: {"qty": 1, "avg_price": self.sig["symbols"][s]["close"]}})
+        self.assertTrue(any(x["symbol"] == s for x in p["add_stops"]) or any(x["symbol"] == s for x in p["sells"]))
+
+    def test_stale_signals_halt(self):
+        from sentinel.live_plan import make_plan
+        a = {"value": 1000.0, "cash": 1000.0, "positions": {}, "stops": {}}
+        p = make_plan(self.sig, a, self.cfg, cap=1000, peak=1000, today=self.today + timedelta(days=30))
+        self.assertTrue(p["halts"]); self.assertFalse(p["buys"])

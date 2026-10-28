@@ -283,6 +283,33 @@ def cmd_run(args):
     run_once(cfg, broker, mem, risk, load_recent(cfg), dry_run=args.dry_run)
 
 
+def cmd_signals(args):
+    from .data import load_recent
+    from .live_plan import signals_table
+
+    cfg = load_settings(args.settings)
+    if args.source:
+        cfg["data"]["source"] = args.source
+    spec = json.loads(resolve(args.spec).read_text(encoding="utf-8"))
+    sig = signals_table(spec, load_recent(cfg))
+    out = resolve(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(sig, indent=1), encoding="utf-8")
+    n = sum(r["entry"] for r in sig["symbols"].values())
+    print(f"wrote {out}: {len(sig['symbols'])} symbols as of {sig['as_of']}, {n} with buy signals")
+
+
+def cmd_plan(args):
+    from .live_plan import make_plan, summary
+
+    cfg = load_settings(args.settings)
+    sig = json.loads(resolve(args.signals).read_text(encoding="utf-8"))
+    acct = json.loads(Path(args.account).read_text(encoding="utf-8"))
+    plan = make_plan(sig, acct, cfg, cap=args.cap, peak=args.peak)
+    print(summary(plan))
+    print("PLAN_JSON " + json.dumps(plan))
+
+
 def cmd_kill(args):
     _, mem, risk, _ = _ctx(args)
     risk.kill(args.reason or "manual")
@@ -352,6 +379,11 @@ def main(argv=None):
     p = add("run-once", cmd_run, "one trading cycle (schedule daily after the open)")
     p.add_argument("--broker", choices=["paper", "alpaca_paper", "alpaca_live", "ticket"])
     p.add_argument("--dry-run", action="store_true")
+    p = add("signals", cmd_signals, "write today's per-symbol strategy signals (needs market data)")
+    p.add_argument("--spec", required=True); p.add_argument("--out", default="signals/latest.json")
+    p = add("plan", cmd_plan, "turn a signals file + real account state into exact orders (no network)")
+    p.add_argument("--signals", default="signals/latest.json"); p.add_argument("--account", required=True)
+    p.add_argument("--cap", type=float, default=1000.0); p.add_argument("--peak", type=float, required=True)
     p = add("kill", cmd_kill, "engage kill switch"); p.add_argument("--reason")
     add("unkill", cmd_unkill, "release kill switch and clear halts")
     p = add("pine", cmd_pine, "export a strategy to TradingView Pine Script v5")

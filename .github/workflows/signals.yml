@@ -1,0 +1,26 @@
+name: daily-signals
+# Computes the trend_momentum signals for the ETF universe every weekday before the US open
+# and commits signals/latest.json. A scheduled Claude session reads it and places orders.
+on:
+  schedule:
+    - cron: "5 12 * * 1-5"   # 12:05 UTC = 7:05 AM Central (CDT) / 6:05 AM (CST)
+  workflow_dispatch: {}
+permissions:
+  contents: write
+jobs:
+  signals:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pandas numpy pyyaml yfinance
+      - run: python -m sentinel --settings config/settings_etf.yaml signals --spec strategies/trend_momentum.json --out signals/latest.json
+      - name: Commit signals
+        run: |
+          git config user.name "sentinel-signals"
+          git config user.email "actions@users.noreply.github.com"
+          git add signals/latest.json
+          git diff --cached --quiet || git commit -m "signals: $(date -u +%F) [skip ci]"
+          git push

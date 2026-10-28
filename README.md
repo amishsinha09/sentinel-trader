@@ -146,6 +146,11 @@ Paste the file into the Pine Editor → *Add to chart* → *Strategy Tester*. En
 
 ## Robinhood
 
+**Scheduled mode.** `.github/workflows/signals.yml` runs `signals` every weekday at 12:05 UTC and commits
+`signals/latest.json`. A scheduled Claude session then reads it, gets the real cash, positions and resting
+stops from Robinhood, runs `plan --account ... --peak ...`, and places exactly the resulting orders.
+To pause all new buys, create an empty file `config/PAUSE` in the repo (sells and stops still work).
+
 Daily flow: run `python -m sentinel --settings config/settings_etf.yaml run-once --broker ticket`, paste the
 `TICKET` lines into Claude, and approve each order Claude places through the Robinhood connector. Then update
 `state_etf/tickets/positions.json` and `account.json` so the bot knows what you hold. Robinhood can't hold a

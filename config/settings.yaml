@@ -1,0 +1,51 @@
+# Sentinel Trader settings. Hard risk limits live in risk_limits.yaml, not here.
+
+universe: [SPY, QQQ, AAPL, MSFT, NVDA, AMZN, META, GOOGL]
+
+data:
+  source: yfinance          # synthetic (offline test) | yfinance (free) | alpaca (needs keys)
+  start: "2015-01-01"
+  max_staleness_days: 4     # refuse new entries if the newest bar is older than this
+
+backtest:
+  initial_capital: 100000
+  commission_per_share: 0.0
+  spread_bps: 2.0           # full spread; half is paid per fill
+  slippage_bps: 3.0
+  max_positions: 5
+  risk_per_trade: 0.01      # 1% of equity at risk to the stop
+  max_position_pct: 0.20
+  max_gross_exposure: 1.0
+
+splits: {dev: 0.6, validation: 0.2, holdout: 0.2}
+
+validation:
+  min_trades_dev: 40
+  min_trades_oos: 20
+  min_oos_sharpe: 0.5
+  max_oos_drawdown: 0.25
+  min_oos_is_ratio: 0.3       # OOS Sharpe must keep >=30% of in-sample Sharpe
+  walk_forward_windows: 5
+  min_wf_positive_frac: 0.6
+  sensitivity_pct: 0.2        # each param nudged +/-20%
+  min_sensitivity_frac: 0.7
+  cost_stress_mult: 2.0
+  min_dsr: 0.90               # Deflated Sharpe: penalises the number of strategies tried
+  min_improvement_sharpe: 0.10
+
+research:
+  agent: auto                 # auto = Claude if ANTHROPIC_API_KEY is set, else offline mutation agent
+  model: claude-sonnet-5-5
+  iterations: 10
+  auto_promote_paper: true    # passing candidates go to paper automatically; live never does
+  baseline_spec: strategies/baseline_trend_pullback.json
+
+execution:
+  broker: paper               # paper | alpaca_paper | alpaca_live | ticket
+  role: paper
+  options_enabled: false
+
+alerts:
+  webhook_url_env: ALERT_WEBHOOK_URL
+
+state_dir: state

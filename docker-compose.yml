@@ -1,0 +1,20 @@
+# Laptop or a small cloud VM. Run jobs on demand, e.g.:
+#   docker compose run --rm research
+#   docker compose run --rm trader
+# Schedule `trader` daily at 9:35 ET and `research` weekly (cron, Task Scheduler, or EventBridge on AWS).
+services:
+  research:
+    build: .
+    env_file: .env
+    volumes: ["./state:/app/state", "./config:/app/config:ro", "./strategies:/app/strategies:ro"]
+    command: ["research", "--iterations", "10"]
+  trader:
+    build: .
+    env_file: .env
+    volumes: ["./state:/app/state", "./config:/app/config:ro"]
+    command: ["run-once"]
+  report:
+    build: .
+    env_file: .env
+    volumes: ["./state:/app/state", "./config:/app/config:ro"]
+    command: ["report"]

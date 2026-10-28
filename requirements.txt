@@ -1,6 +1,6 @@
-streamlit
-yfinance
-ta
-pandas
-requests
-alpaca-trade-api
+pandas>=2.0
+numpy>=1.24
+pyyaml>=6.0
+yfinance>=0.2.40     # free daily data
+alpaca-py>=0.33      # broker + data (paper and live)
+anthropic>=0.40      # Claude research agent (optional: offline agent used without a key)

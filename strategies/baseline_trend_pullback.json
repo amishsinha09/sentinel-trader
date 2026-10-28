@@ -1,0 +1,25 @@
+{
+  "name": "trend_pullback",
+  "version": "1.0",
+  "description": "Buy pullbacks to the 50 EMA inside a 200 EMA uptrend with RSI confirmation.",
+  "direction": "long",
+  "params": {
+    "ema_trend": 200,
+    "ema_entry": 50,
+    "rsi_period": 14,
+    "rsi_min": 50,
+    "atr_period": 14,
+    "stop_atr": 2.0,
+    "target_atr": 4.0,
+    "max_hold_bars": 20
+  },
+  "entry": {"all": [
+    {"left": "close", "op": ">", "right": "ema(ema_trend)"},
+    {"left": "low", "op": "<=", "right": "ema(ema_entry)"},
+    {"left": "close", "op": ">", "right": "ema(ema_entry)"},
+    {"left": "rsi(rsi_period)", "op": ">", "right": "param(rsi_min)"}
+  ]},
+  "exit": {"any": [
+    {"left": "close", "op": "<", "right": "ema(ema_trend)"}
+  ]}
+}

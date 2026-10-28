@@ -1,0 +1,27 @@
+# HARD RISK LIMITS — enforced by sentinel/risk.py on every order.
+# The research loop has no write path to this file. Change it by hand only.
+# Exits (risk-reducing orders) are always allowed, even when trading is halted.
+
+live_trading_enabled: false     # must be true (and a strategy promoted with --to live) for real money
+
+max_risk_per_trade_pct: 1.0     # loss at stop, as % of equity
+max_position_pct: 20.0          # notional per position, % of equity
+max_gross_exposure_pct: 100.0   # total notional, % of equity (no leverage)
+max_open_positions: 5
+max_orders_per_day: 20
+
+daily_loss_limit_pct: 3.0       # halt new entries for the day after this loss from the day's start
+max_drawdown_halt_pct: 15.0     # halt until manual reset after this drawdown from peak equity
+max_consecutive_errors: 3       # broker rejections/errors in a row -> halt (circuit breaker)
+
+min_price: 5.0                  # no penny stocks
+max_spread_bps: 25              # skip if the live bid/ask spread is wider than this
+require_market_hours: true      # live brokers only
+
+options:
+  defined_risk_only: true       # spreads / long premium only — no naked short options
+  max_loss_per_trade_pct: 1.0
+  min_open_interest: 500
+  max_bid_ask_pct: 10.0         # (ask-bid)/mid
+  min_dte: 14
+  max_dte: 60

@@ -1,0 +1,21 @@
+# Diversified ETF universe: equity sectors, small caps, international, bonds, gold.
+# Uses its own state folder, so its experiments and trial count stay separate.
+# Run any command with:  python -m sentinel --settings config/settings_etf.yaml <command>
+
+universe: [XLK, XLF, XLE, XLV, XLI, XLY, XLP, XLU, XLB, IWM, EFA, EEM, TLT, IEF, GLD]
+
+data:
+  source: yfinance
+  start: "2005-01-01"
+  max_staleness_days: 4
+
+backtest:
+  initial_capital: 100000
+  spread_bps: 2.0
+  slippage_bps: 3.0
+  max_positions: 8            # more instruments -> hold more, smaller positions
+  risk_per_trade: 0.01
+  max_position_pct: 0.15
+  max_gross_exposure: 1.0
+
+state_dir: state_etf

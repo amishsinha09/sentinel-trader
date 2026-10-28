@@ -8,7 +8,7 @@ import json
 from ..alerts import Alerts
 from ..config import resolve
 from ..memory import Memory
-from ..strategy import SpecError, spec_hash, validate_spec
+from ..strategy import SpecError, describe, spec_hash, validate_spec
 from ..validation import evaluate_candidate, split_dates
 from .diagnose import diagnose
 
@@ -94,7 +94,9 @@ def research(cfg: dict, data: dict, mem: Memory, agent, iterations: int, log=pri
         status = "promoted" if rep["passed"] and improved else "rejected"
         mem.record(h, spec, rep, status, prop["hypothesis"], agent.name, champ["hash"], failed)
         log(f"[{it}] {h} {status.upper():8} OOS sharpe {nv['sharpe']:.2f} (champ {cv['sharpe']:.2f}) "
-            f"DSR {rep['dsr']:.2f} | {prop['hypothesis'][:90]}" + (f" | failed: {failed}" if failed else ""))
+            f"DSR {rep['dsr']:.2f}" + (f" | failed: {failed}" if failed else ""))
+        log(f"      idea: {prop['hypothesis']}")
+        log(f"      rules: {describe(spec)}")
         results.append({"hash": h, "status": status, "hypothesis": prop["hypothesis"], "failed": failed})
         if status == "promoted":
             mem.set_champion("research", h, agent.name)
@@ -105,5 +107,5 @@ def research(cfg: dict, data: dict, mem: Memory, agent, iterations: int, log=pri
     u = getattr(agent, "usage", None)
     if u and u["calls"]:
         log(f"Claude API usage this run: {u['calls']} calls, {u['input_tokens']:,} input + "
-            f"{u['output_tokens']:,} output tokens (see console.anthropic.com for cost)")
+            f"{u['output_tokens']:,} output tokens (cost: platform.claude.com > Usage)")
     return results

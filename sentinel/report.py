@@ -59,6 +59,11 @@ def _setup_name(universe: list[str]) -> str:
 def _verdict(mem, roles, holdouts, current) -> tuple[str, str, str]:
     if roles["live"]:
         return "live", "LIVE — trading real money", f"Strategy {roles['live']['hash']} is approved for real money."
+    if roles["paper"] and mem.is_override("paper"):
+        why = mem.approved_by("paper").split(":", 1)[-1].strip()
+        return "paper", "PRACTICE MODE (override) — play money only", \
+            (f"Strategy {roles['paper']['hash']} did NOT pass the safety checks. It is paper-trading for observation "
+             f"only and cannot go live. Reason given: {why}")
     if roles["paper"]:
         return "paper", "PRACTICE MODE — paper trading only", \
             f"Strategy {roles['paper']['hash']} passed every safety check and may trade with play money. Not approved for real money."

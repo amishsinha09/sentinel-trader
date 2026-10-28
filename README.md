@@ -166,6 +166,17 @@ Included ideas: `trend_pullback` (short-term swing; rejected on both universes i
 `trend_momentum` (hold above the 200-day SMA with positive 6-month momentum, strongest first).
 A spec's optional `rank_by` term decides which signals fill the free position slots.
 
+## Watching a rejected strategy on paper (override)
+
+To see a strategy trade with play money even though it failed the checks:
+
+```bash
+python -m sentinel --settings config/settings_etf.yaml promote <hash> --to paper --override --reason "observe only"
+```
+
+You type the hash to confirm, and the reason is logged. The dashboard marks it **PRACTICE MODE (override)**.
+It can never reach live trading this way, and research never silently replaces or demotes it.
+
 ## One-time holdout confirmation
 
 If research ends with a near-miss that failed only the Deflated Sharpe check, you may test **one**

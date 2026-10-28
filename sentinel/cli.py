@@ -158,13 +158,32 @@ def cmd_promote(args):
     e = mem.get(args.hash)
     if not e:
         sys.exit(f"unknown strategy {args.hash}")
-    if mem.holdout_failed(args.hash):
-        sys.exit("refused: this strategy failed its holdout test on unseen data")
     gated = bool(e["report"] and e["report"]["passed"])
     confirmed = mem.holdout_confirmed(args.hash)
+    if args.override and args.to != "paper":
+        sys.exit("refused: --override works for paper trading only. Real money always needs every check passed.")
+    if args.to == "paper" and args.override:
+        if gated or confirmed:
+            sys.exit("no override needed: this strategy is approved; run without --override")
+        if mem.holdout_failed(args.hash):
+            print("WARNING: this strategy FAILED its final exam on never-seen data.")
+        reason = (args.reason or "").strip()
+        if not reason:
+            sys.exit("add --reason \"...\" explaining why you are paper-trading a strategy that failed the checks")
+        print(f"PAPER-ONLY OVERRIDE for {args.hash}. It did NOT pass the safety checks.")
+        print("It will trade play money only. It can never be promoted to live through this override.")
+        if input(f"Type the strategy hash ({args.hash}) to confirm: ").strip() != args.hash:
+            sys.exit("not confirmed")
+        mem.set_champion("paper", args.hash, f"override: {reason}")
+        mem.event("paper_override", f"{args.hash}: {reason}")
+        print(f"paper strategy -> {args.hash} (override)")
+        return
+    if mem.holdout_failed(args.hash):
+        sys.exit("refused: this strategy failed its holdout test on unseen data")
     if args.to == "paper":
         if not (gated or confirmed):
-            sys.exit("refused: this strategy did not pass the validation gate or a holdout confirmation")
+            sys.exit("refused: this strategy did not pass the validation gate or a holdout confirmation.\n"
+                     "To watch it trade with play money anyway: add --override --reason \"...\"")
         mem.set_champion("paper", args.hash, "human")
         print(f"paper champion -> {args.hash}")
         return
@@ -212,7 +231,10 @@ def cmd_run(args):
     broker = make_broker(cfg)
     if broker.live:
         print("*** LIVE BROKER — real money ***")
-    run_once(cfg, broker, mem, risk, load(refresh=True), dry_run=args.dry_run)
+    from .data import load_recent
+
+    # fresh prices WITHOUT overwriting the research cache (keeps research results and holdout fixed)
+    run_once(cfg, broker, mem, risk, load_recent(cfg), dry_run=args.dry_run)
 
 
 def cmd_kill(args):
@@ -277,6 +299,8 @@ def main(argv=None):
     add("status", cmd_status, "champions, trials, risk state")
     p = add("promote", cmd_promote, "promote a strategy (live requires holdout test + typed approval)")
     p.add_argument("hash"); p.add_argument("--to", choices=["paper", "live"], required=True)
+    p.add_argument("--override", action="store_true", help="paper only: paper-trade a strategy that failed the checks")
+    p.add_argument("--reason", help="why (required with --override; logged)")
     p = add("confirm", cmd_confirm, "ONE-TIME holdout confirmation of a single pre-chosen strategy")
     p.add_argument("hash")
     p = add("run-once", cmd_run, "one trading cycle (schedule daily after the open)")

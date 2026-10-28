@@ -18,4 +18,9 @@ backtest:
   max_position_pct: 0.20
   max_gross_exposure: 1.0
 
+execution:
+  broker: alpaca_paper        # play money at Alpaca; see README
+  role: paper
+  options_enabled: false
+
 state_dir: state_etf

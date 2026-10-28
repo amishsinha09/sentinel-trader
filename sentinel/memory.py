@@ -78,6 +78,13 @@ class Memory:
         self.db.commit()
         self.event("champion", f"{role} champion removed: {reason}")
 
+    def approved_by(self, role: str) -> str | None:
+        r = self.db.execute("SELECT approved_by FROM champions WHERE role=?", (role,)).fetchone()
+        return r["approved_by"] if r else None
+
+    def is_override(self, role: str) -> bool:
+        return (self.approved_by(role) or "").startswith("override")
+
     def champion(self, role: str) -> dict | None:
         r = self.db.execute("SELECT hash FROM champions WHERE role=?", (role,)).fetchone()
         return self.get(r["hash"]) if r else None

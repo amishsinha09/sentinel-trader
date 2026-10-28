@@ -11,6 +11,9 @@ from .base import Broker
 
 class AlpacaBroker(Broker):
     def __init__(self, paper: bool = True):
+        if not os.environ.get("ALPACA_API_KEY") or not os.environ.get("ALPACA_SECRET_KEY"):
+            raise SystemExit("Alpaca keys missing: put ALPACA_API_KEY and ALPACA_SECRET_KEY in .env "
+                             f"({'paper' if paper else 'LIVE'} account keys).")
         from alpaca.trading.client import TradingClient
 
         self.paper = paper
@@ -58,8 +61,13 @@ class AlpacaBroker(Broker):
             return {"ok": False, "error": str(e)}
 
     def close(self, symbol):
+        from alpaca.trading.enums import QueryOrderStatus
+        from alpaca.trading.requests import GetOrdersRequest
+
         try:
-            self.client.cancel_orders()  # cancels resting bracket legs, then flatten
+            # cancel ONLY this symbol's resting stop/target legs; other positions keep their protection
+            for o in self.client.get_orders(GetOrdersRequest(status=QueryOrderStatus.OPEN, symbols=[symbol])):
+                self.client.cancel_order_by_id(o.id)
             self.client.close_position(symbol)
             return {"ok": True}
         except Exception as e:

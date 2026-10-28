@@ -32,6 +32,50 @@ Runs on your laptop or a small cloud VM. Exports winning strategies to **Trading
                                                    live champion ──► broker (bracket orders)
 ```
 
+## Findings (October 2026)
+
+**Result: no strategy earned the right to trade.** Every candidate was rejected, including the one
+strategy that went through the one-time holdout test. The system did what it was built to do: it
+refused to promote a backtest that would most likely have lost to simply holding the same assets.
+
+**Setup.** Daily bars from 2005 to 2026 via yfinance. Splits are about 60% development (2005–2018),
+20% validation (about 2018–2022) and 20% untouched holdout (about 2022–2026). Costs are 2 bps spread
+plus 3 bps slippage per fill. The benchmark is equal-weight buy & hold of the same universe over the
+same window. "OOS" means the validation window.
+
+| Stage | Universe | Strategy | OOS Sharpe | Buy & hold Sharpe | Max DD (strategy vs B&H) | Verdict |
+|---|---|---|---|---|---|---|
+| 1 | 8 mega-caps, 2015+ | Trend pullback (baseline) | 0.23 | — | 12.2% | Fail |
+| 1 | 8 mega-caps, 2015+ | Pullback, no EMA-touch rule | **1.18** | — | 13.7% | Failed only Deflated Sharpe |
+| 2 | 8 mega-caps, 2005+ | Same "winner", longer history | **0.69** | 0.73 | 16.4% vs 31.7% | Collapsed: the 1.18 came from one lucky window |
+| 2 | 8 mega-caps, 2005+ | Trend pullback (baseline) | 0.60 | 0.73 | 12.9% vs 31.7% | Fail |
+| 3 | 15 ETFs | Trend pullback | 0.07 | 0.52 | 7.1% vs 29.0% | Fail; lost money at 2× costs |
+| 4 | 15 ETFs | Trend + momentum (Faber; Moskowitz et al.) | 0.54 (CAGR 4.2%) | 0.52 (CAGR 7.5%) | 9.0% vs 29.0% | Same risk-adjusted return, much less return |
+| 5 | 15 ETFs | 19 Claude-proposed candidates | 0.14–0.88 | 0.52 | — | All failed; best = trend + ADX < 25 |
+| 6 | 15 ETFs | **Holdout test** of `8f78fe1a9217` (trend + ADX < 25) | 0.73 (CAGR 5.3%) | 1.11 (CAGR 13.6%) | 9.8% vs 13.5% | **Not confirmed** |
+
+There were 45 counted experiments in total: 16 on the stock universe and 29 on the ETF universe.
+Re-tests on new data and duplicates were not counted.
+
+**What we learned**
+
+- **Short history manufactures winners.** The best result from 2015 onward (Sharpe 1.18) fell to 0.69
+  once history went back to 2005. Without the longer test it would have looked tradable.
+- **Searching inflates the best result.** After 29 trials on one validation window, a Sharpe near 1.0
+  is about what luck alone produces. The Deflated Sharpe check rejected the 0.88 near-miss for that
+  reason, and the clean holdout agreed: it beat zero (93% confidence) but lost clearly to buy & hold.
+- **Being in cash is the hidden cost of trend filters.** They cut drawdowns sharply in 2008-type markets,
+  but in a strong market the time spent in cash costs more than the protection is worth. Over the holdout
+  years, buy & hold had a smaller worst drawdown than the strategy's historical advantage implied, and
+  more than twice its return.
+- **Short-horizon swing rules on daily bars lose to costs.** Pullback and RSI(2) mean-reversion variants
+  failed on every universe.
+- **An LLM researcher is useful but no shortcut.** Claude proposed varied, well-reasoned, cited ideas and
+  recognised dead ends. Every idea is still a trial, though, and the statistics decide.
+
+**Status:** the ETF holdout has been used up. Any further research on this setup needs new out-of-sample
+data, meaning time spent paper trading, or a genuinely different data source or universe.
+
 ## Layout
 
 ```

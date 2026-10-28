@@ -112,13 +112,25 @@ def run_once(cfg: dict, broker, mem, risk, data: dict, dry_run: bool = False, lo
     if not dry_run:
         state_f.write_text(json.dumps(owned, indent=1), encoding="utf-8")
     acct = broker.account()
+    # snapshot for the dashboard: open positions with live stop/target levels
+    snap = {}
+    for s, pz in broker.positions().items():
+        last = float(data[s].close.iloc[-1]) if s in data else pz["avg_price"]
+        a = float(sigs[s][2].iloc[-1]) if s in sigs else float("nan")
+        snap[s] = {"qty": pz["qty"], "avg_price": pz["avg_price"], "last": last,
+                   "pnl": (last - pz["avg_price"]) * pz["qty"],
+                   "stop": pz["avg_price"] - p["stop_atr"] * a if math.isfinite(a) else None,
+                   "target": pz["avg_price"] + p["target_atr"] * a if math.isfinite(a) else None,
+                   "since": owned.get(s, {}).get("entry_date")}
+    out["positions"] = snap
+    out["cash"] = acct["cash"]
     summary = (f"{broker.name}: equity ${acct['equity']:,.0f} | entries {[e['symbol'] for e in out['entries']]} "
                f"| exits {[e['symbol'] for e in out['exits']]} | skipped {len(out['skipped'])}")
     log(summary)
     if out["entries"] or out["exits"]:
         alerts.send(summary)
-    mem.event("run", summary, out)
     out["equity"] = acct["equity"]
+    mem.event("run", summary, out)
     return out
 
 

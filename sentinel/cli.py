@@ -243,8 +243,15 @@ def cmd_pine(args):
 def cmd_report(args):
     from .report import build_report
 
+    from .data import load_recent
+
     cfg, mem, risk, load = _ctx(args)
-    p = build_report(cfg, load(), mem, risk, args.out or Path(cfg["state_dir"]) / "report.html")
+    recent = None
+    try:
+        recent = load_recent(cfg)
+    except Exception as e:
+        print(f"could not fetch fresh prices ({e}); trading view uses the research data")
+    p = build_report(cfg, load(), mem, risk, args.out or Path(cfg["state_dir"]) / "report.html", recent)
     print(f"wrote {p}")
 
 

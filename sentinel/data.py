@@ -97,6 +97,17 @@ def load_data(cfg: dict, refresh: bool = False) -> dict[str, pd.DataFrame]:
     return data
 
 
+def load_recent(cfg: dict, years: int = 3) -> dict[str, pd.DataFrame]:
+    """Fresh prices for the dashboard. Never written to the research cache, so research results
+    and the holdout boundary are unaffected."""
+    src = cfg["data"]["source"]
+    if src == "synthetic":
+        return load_data(cfg)
+    start = str((pd.Timestamp.today() - pd.DateOffset(years=years)).date())
+    loader = {"yfinance": load_yfinance, "alpaca": load_alpaca}[src]
+    return loader(cfg["universe"], start)
+
+
 def last_bar_age_days(data: dict[str, pd.DataFrame], today=None) -> int:
     today = pd.Timestamp(today or date.today()).normalize()
     last = max(df.index[-1] for df in data.values())

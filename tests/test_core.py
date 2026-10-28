@@ -134,6 +134,20 @@ class TestRisk(unittest.TestCase):
         self.assertFalse(d.approved)
 
 
+class TestTicketIsLive(unittest.TestCase):
+    def test_ticket_mode_needs_live_approval(self):
+        import tempfile
+        from sentinel.brokers.ticket import TicketBroker
+        from sentinel.execution import run_once
+        from sentinel.memory import Memory
+        cfg = load_settings(); cfg["state_dir"] = tempfile.mkdtemp()
+        mem, risk = Memory(cfg["state_dir"]), RiskEngine(cfg["state_dir"])
+        spec = validate_spec(BASE); h = spec_hash(spec)
+        mem.record(h, spec, {"passed": True}, "promoted"); mem.set_champion("paper", h)
+        out = run_once(cfg, TicketBroker(cfg), mem, risk, synthetic(["AAA"], "2020-01-01"), log=lambda *a: None)
+        self.assertIn("error", out)  # a paper-only strategy must not produce real-money tickets
+
+
 class TestOptions(unittest.TestCase):
     def test_structure_map(self):
         self.assertEqual(choose_structure(1, 20), "call_debit_spread")

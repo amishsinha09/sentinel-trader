@@ -15,6 +15,7 @@ from .base import Broker
 
 class TicketBroker(Broker):
     name = "ticket"
+    live = True  # tickets are placed with REAL money, so they need a live-approved strategy and the live lock
 
     def __init__(self, cfg: dict):
         self.dir = Path(cfg["state_dir"]) / "tickets"

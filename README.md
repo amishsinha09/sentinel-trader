@@ -146,7 +146,7 @@ Paste the file into the Pine Editor → *Add to chart* → *Strategy Tester*. En
 
 ## Robinhood
 
-Robinhood has no public stock-trading API for bots. Use `execution.broker: ticket`. Each run writes risk-checked order tickets (entry, stop, target) to `state/tickets/`. You place them yourself, or ask Claude to place them through your Robinhood connector with trade approval on.
+Robinhood has no public stock-trading API for bots. Use `execution.broker: ticket`. Tickets are treated as **real money**: they need a live-approved strategy and `live_trading_enabled: true`. Each run writes risk-checked order tickets (entry, stop, target) to `state/tickets/`. You place them yourself, or ask Claude to place them through your Robinhood connector with trade approval on.
 
 ## Options
 

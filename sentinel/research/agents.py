@@ -1,4 +1,4 @@
-"""Research agents propose ONE modified strategy spec per iteration.
+"""Research agents propose ONE candidate strategy spec per iteration.
 
 ClaudeAgent  — uses the Anthropic API (set ANTHROPIC_API_KEY).
 MutationAgent — offline, diagnosis-guided heuristics. Used when no API key is set, and for tests.
@@ -17,36 +17,68 @@ from ..features import INDICATORS
 from ..strategy import RESERVED, SpecError, spec_hash, validate_spec
 
 GRAMMAR = f"""
-You edit a JSON trading-strategy spec. You never write code.
-Top-level keys allowed: name, version, direction ("long"|"short"), params, entry, exit, description.
+You write a JSON trading-strategy spec. You never write code.
+Top-level keys allowed: name, version, direction, params, entry, exit, description, rank_by.
+direction: must be "long" (the execution layer trades long only; flat = in cash).
 params: flat object of numbers (max 16). Reserved params and ranges: {json.dumps({k: v[:2] for k, v in RESERVED.items()})}.
-entry: {{"all": [conditions]}} (max 8). exit: {{"any": [conditions]}} (max 6).
+entry: {{"all": [conditions]}} (max 8, all must be true). exit: {{"any": [conditions]}} (max 6, any one exits).
 condition: {{"left": TERM, "op": OP, "right": TERM, "scale": optional number 0.1-10 multiplying right}}
 OP: > >= < <= crosses_above crosses_below
 TERM: a number | open|high|low|close|volume | param(NAME) | INDICATOR(PERIOD) where PERIOD is an int 2-400 or an integer param name.
 INDICATORs: {json.dumps({k: v[1] for k, v in INDICATORS.items()})}
-Signals are evaluated at the bar close and filled at the next open; stops/targets are ATR multiples.
+rank_by: optional TERM; when more symbols signal than free slots, the highest value enters first.
+Engine: daily bars; signals at the close, fills at the next open; spread+slippage on every fill; stop and target are
+ATR multiples set at entry; positions also close on any exit condition or after max_hold_bars. Sizing risks a fixed
+% of equity to the stop, capped per position. Cash earns nothing in the backtest.
 """
 
-SYSTEM = """You are a disciplined quantitative researcher improving a daily-bar US equity strategy.
+SYSTEM = """You are a disciplined quantitative researcher looking for a robust, tradable edge in daily-bar data.
+Each turn you propose ONE candidate. It may be a focused change to the current champion, or a clearly different,
+economically motivated idea (trend, momentum, mean reversion, volatility regime, breakout, ...) if the evidence says
+the champion's family is exhausted.
 Rules:
-- Make ONE focused change per proposal, tied to a specific weakness in the diagnosis.
-- Prefer removing complexity over adding it. Fewer conditions generalise better.
-- Do not repeat a change that the history shows was already rejected.
-- Use round, economically sensible parameter values (e.g. 20, 50, 200), not curve-fit decimals.
-- Every test you request is counted and penalised by a Deflated Sharpe gate; propose only changes you
-  expect to hold up out of sample.
-Reply with ONLY a JSON object: {"hypothesis": "...", "change": "...", "spec": {...full spec...}}"""
+- Tie the proposal to the evidence: the diagnosis, the gate results, the benchmark, and what has already failed.
+- Prefer simple rules with an economic reason to work. Fewer conditions generalise better.
+- Never repeat or trivially re-parameterise something in the experiment history.
+- Use round, conventional parameter values (10, 20, 50, 100, 200, 0.5, 2.0), never fitted decimals.
+- Every candidate is counted by a Deflated Sharpe gate that gets stricter with each trial, and results are judged
+  out of sample. Do not spend trials on tiny tweaks. A candidate must plausibly beat both the champion and
+  equal-weight buy & hold on a risk-adjusted basis.
+Reply with ONLY a JSON object:
+{"hypothesis": "why this should work, citing the evidence", "change": "what is different", "spec": {...full spec...}}"""
 
 
 def _history_lines(history: list[dict]) -> str:
+    from ..strategy import describe
+
     lines = []
     for h in history or []:
         rep = h.get("report") or {}
-        v = rep.get("validation", {})
-        lines.append(f"- [{h['status']}] {h.get('hypothesis', '')[:140]} | OOS sharpe {v.get('sharpe', 0):.2f}"
-                     f" | failed: {', '.join(h.get('reasons') or []) or '-'}")
+        v, b = rep.get("validation", {}), rep.get("benchmark_validation", {})
+        try:
+            rules = describe(h["spec"])
+        except Exception:
+            rules = "?"
+        lines.append(f"- [{h['status']}] {rules}\n    OOS sharpe {v.get('sharpe', 0):.2f}, CAGR {v.get('cagr', 0):.1%}, "
+                     f"maxDD {v.get('max_drawdown', 0):.1%} (buy&hold sharpe {b.get('sharpe', 0):.2f}) | "
+                     f"failed: {', '.join(h.get('reasons') or []) or '-'}")
     return "\n".join(lines) or "(none yet)"
+
+
+def _context_text(ctx: dict) -> str:
+    if not ctx:
+        return ""
+    rep = ctx.get("report") or {}
+    v, b = rep.get("validation", {}), rep.get("benchmark_validation", {})
+    checks = "\n".join(f"  {'PASS' if c['pass'] else 'FAIL'} {c['name']}: {c['value']} (need {c['threshold']})"
+                       for c in rep.get("checks", []))
+    return (f"UNIVERSE: {', '.join(ctx.get('universe', []))}\n"
+            f"TRIALS SO FAR (each one raises the Deflated Sharpe bar): {ctx.get('n_trials')}\n"
+            f"CHAMPION OUT-OF-SAMPLE: sharpe {v.get('sharpe', 0):.2f}, CAGR {v.get('cagr', 0):.1%}, "
+            f"maxDD {v.get('max_drawdown', 0):.1%}, trades {v.get('n_trades', 0)}\n"
+            f"EQUAL-WEIGHT BUY & HOLD, SAME WINDOW: sharpe {b.get('sharpe', 0):.2f}, CAGR {b.get('cagr', 0):.1%}, "
+            f"maxDD {b.get('max_drawdown', 0):.1%}\n"
+            f"CHAMPION GATE RESULTS:\n{checks}\n")
 
 
 class ClaudeAgent:
@@ -57,22 +89,31 @@ class ClaudeAgent:
 
         self.client = anthropic.Anthropic()
         self.model = model
+        self.usage = {"calls": 0, "input_tokens": 0, "output_tokens": 0}
 
-    def propose(self, champion: dict, diagnosis: dict, history: list[dict]) -> dict:
-        prompt = (f"{GRAMMAR}\nCURRENT CHAMPION SPEC:\n{json.dumps(champion, indent=1)}\n\n"
-                  f"DIAGNOSIS (development window only):\n{json.dumps(diagnosis, indent=1, default=str)}\n\n"
-                  f"RECENT EXPERIMENTS:\n{_history_lines(history)}\n\nPropose one improvement.")
+    def propose(self, champion: dict, diagnosis: dict, history: list[dict], context: dict | None = None) -> dict:
+        prompt = (f"{GRAMMAR}\n{_context_text(context)}\nCURRENT CHAMPION SPEC:\n{json.dumps(champion, indent=1)}\n\n"
+                  f"DIAGNOSIS OF THE CHAMPION (development window only):\n"
+                  f"{json.dumps(diagnosis, indent=1, default=str)}\n\n"
+                  f"EXPERIMENT HISTORY (newest first, all scored on the current data):\n{_history_lines(history)}\n\n"
+                  f"Propose one candidate.")
         messages = [{"role": "user", "content": prompt}]
         last_err = None
         for _ in range(3):
-            resp = self.client.messages.create(model=self.model, max_tokens=3000, system=SYSTEM, messages=messages)
+            resp = self.client.messages.create(model=self.model, max_tokens=4000, system=SYSTEM, messages=messages)
+            self.usage["calls"] += 1
+            u = getattr(resp, "usage", None)
+            self.usage["input_tokens"] += getattr(u, "input_tokens", 0) or 0
+            self.usage["output_tokens"] += getattr(u, "output_tokens", 0) or 0
             text = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
             try:
                 m = re.search(r"\{.*\}", text, re.S)
                 out = json.loads(m.group(0))
-                out["spec"] = validate_spec(out["spec"])
-                return {"spec": out["spec"], "hypothesis": f"{out.get('hypothesis', '')} | {out.get('change', '')}"}
-            except (AttributeError, KeyError, ValueError, SpecError) as e:
+                spec = validate_spec(out["spec"])
+                if spec["direction"] != "long":
+                    raise SpecError("direction must be long")
+                return {"spec": spec, "hypothesis": f"{out.get('hypothesis', '')} | {out.get('change', '')}"}
+            except (AttributeError, KeyError, TypeError, ValueError, SpecError) as e:
                 last_err = e
                 messages += [{"role": "assistant", "content": text},
                              {"role": "user", "content": f"That spec was invalid: {e}. Reply with corrected JSON only."}]
@@ -89,7 +130,7 @@ class MutationAgent:
     def _has(self, spec, ind):
         return any(ind in str(c["left"]) + str(c["right"]) for c in spec["entry"]["all"])
 
-    def propose(self, champion: dict, diagnosis: dict, history: list[dict]) -> dict:
+    def propose(self, champion: dict, diagnosis: dict, history: list[dict], context: dict | None = None) -> dict:
         tried = {h["hash"] for h in history or []}
         ideas = []
         s0 = copy.deepcopy(champion)

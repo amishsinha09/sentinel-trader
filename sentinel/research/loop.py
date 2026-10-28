@@ -62,7 +62,8 @@ def research(cfg: dict, data: dict, mem: Memory, agent, iterations: int, log=pri
         diag = diagnose(champ["spec"], data, cfg)
         history = [e for e in mem.recent(200) if fresh(e)][:20]
         try:
-            prop = agent.propose(champ["spec"], diag, history)
+            ctx = {"report": champ["report"], "universe": sorted(data), "n_trials": mem.trial_count()}
+            prop = agent.propose(champ["spec"], diag, history, context=ctx)
             if prop is None:
                 log(f"[{it}] {agent.name} agent has no untested ideas left. Add ANTHROPIC_API_KEY for the Claude "
                     "researcher, or write a new baseline idea in strategies/.")
@@ -72,6 +73,10 @@ def research(cfg: dict, data: dict, mem: Memory, agent, iterations: int, log=pri
             log(f"[{it}] invalid proposal: {e}")
             mem.event("invalid_proposal", str(e))
             continue
+        except Exception as e:  # API key, credit, network or rate-limit problems: stop cleanly
+            log(f"[{it}] research agent error, stopping: {type(e).__name__}: {e}")
+            mem.event("agent_error", f"{type(e).__name__}: {e}")
+            break
         h = spec_hash(spec)
         if mem.exists(h) and fresh(mem.get(h)):
             log(f"[{it}] duplicate of {h}, skipped (not counted)")
@@ -97,4 +102,8 @@ def research(cfg: dict, data: dict, mem: Memory, agent, iterations: int, log=pri
                 mem.set_champion("paper", h, agent.name)
             alerts.send(f"New strategy promoted to paper: {h} (OOS Sharpe {nv['sharpe']:.2f}). {prop['hypothesis'][:200]}")
             champ = mem.get(h)
+    u = getattr(agent, "usage", None)
+    if u and u["calls"]:
+        log(f"Claude API usage this run: {u['calls']} calls, {u['input_tokens']:,} input + "
+            f"{u['output_tokens']:,} output tokens (see console.anthropic.com for cost)")
     return results

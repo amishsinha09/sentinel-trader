@@ -103,6 +103,7 @@ strategies/               baseline spec  deploy/                   laptop schedu
 Requires Python 3.11+.
 
 ```bash
+git clone https://github.com/amishsinha09/sentinel-trader
 cd sentinel-trader
 python -m venv .venv && source .venv/bin/activate      # Windows: .venv\Scripts\Activate.ps1
 pip install -r requirements.txt

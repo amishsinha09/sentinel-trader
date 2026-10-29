@@ -310,6 +310,45 @@ def cmd_plan(args):
     print("PLAN_JSON " + json.dumps(plan))
 
 
+def cmd_replay(args):
+    from .portfolio import make_sleeves, run_portfolio
+    from .replay import build_payload, render
+    from .strategy import spec_hash, validate_spec
+    from .validation import split_dates
+
+    cfg, mem, _, load = _ctx(args)
+    paths = args.spec or ["strategies/trend_momentum.json"]
+    specs = [validate_spec(json.loads(resolve(p).read_text(encoding="utf-8"))) for p in paths]
+    weights = [float(x) for x in args.weights.split(",")] if args.weights else None
+    if weights and len(weights) != len(specs):
+        sys.exit("--weights needs one number per --spec")
+    data = load()
+    res = run_portfolio(make_sleeves(specs, weights), data, cfg["backtest"])
+    w = split_dates(data, cfg["splits"])
+    windows = {k: [str(a.date()), str(b.date())] for k, (a, b) in w.items()}
+    status = []
+    for s in specs:
+        h, e = spec_hash(s), mem.get(spec_hash(s))
+        if mem.holdout_failed(h):
+            status.append(f"{s['name']} ({h}): FAILED its final exam on unseen data")
+        elif e and e.get("report"):
+            failed = [c["name"] for c in e["report"]["checks"] if not c["pass"]]
+            status.append(f"{s['name']} ({h}): " + ("passed the validation gate" if not failed else
+                                                     "did NOT pass the validation gate (failed: " + ", ".join(failed) + ")"))
+        else:
+            status.append(f"{s['name']} ({h}): never validated on this setup")
+    m, b = res.metrics, res.benchmark
+    bcagr = (b.iloc[-1] / b.iloc[0]) ** (252 / max(len(b) - 1, 1)) - 1
+    note = ("Simulated backtest, not live results. Includes trading costs. "
+            f"Whole period: strategy {m['cagr']:.1%}/yr, worst drop {m['max_drawdown']:.0%}; "
+            f"buy & hold of the same ETFs {bcagr:.1%}/yr, worst drop {(1 - b / b.cummax()).max():.0%}. "
+            "Validation: " + "; ".join(status) + ".")
+    bt = cfg["backtest"]
+    payload = build_payload(res, windows, "Sentinel replay", note, bt["spread_bps"] / 2 + bt["slippage_bps"])
+    out = render(payload, args.out or Path(cfg["state_dir"]) / "replay.html")
+    print(f"wrote {out}  ({len(res.trades)} trades, {len(payload['nodes'])} nodes)")
+
+
 def cmd_kill(args):
     _, mem, risk, _ = _ctx(args)
     risk.kill(args.reason or "manual")
@@ -384,6 +423,10 @@ def main(argv=None):
     p = add("plan", cmd_plan, "turn a signals file + real account state into exact orders (no network)")
     p.add_argument("--signals", default="signals/latest.json"); p.add_argument("--account", required=True)
     p.add_argument("--cap", type=float, default=1000.0); p.add_argument("--peak", type=float, required=True)
+    p = add("replay", cmd_replay, "animated replay of one or more strategies sharing one account")
+    p.add_argument("--spec", action="append", help="strategy file; repeat for several (default trend_momentum)")
+    p.add_argument("--weights", help="capital split, e.g. 0.5,0.3,0.2 (default equal)")
+    p.add_argument("--out")
     p = add("kill", cmd_kill, "engage kill switch"); p.add_argument("--reason")
     add("unkill", cmd_unkill, "release kill switch and clear halts")
     p = add("pine", cmd_pine, "export a strategy to TradingView Pine Script v5")

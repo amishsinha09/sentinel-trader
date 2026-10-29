@@ -227,3 +227,29 @@ class TestLivePlan(unittest.TestCase):
         a = {"value": 1000.0, "cash": 1000.0, "positions": {}, "stops": {}}
         p = make_plan(self.sig, a, self.cfg, cap=1000, peak=1000, today=self.today + timedelta(days=30))
         self.assertTrue(p["halts"]); self.assertFalse(p["buys"])
+
+
+class TestPortfolioReplay(unittest.TestCase):
+    def test_single_sleeve_matches_backtest_and_replay_renders(self):
+        import tempfile
+        from sentinel.portfolio import make_sleeves, run_portfolio
+        from sentinel.replay import build_payload, render
+        cfg = load_settings("config/settings_etf.yaml")
+        data = synthetic(cfg["universe"][:6], "2016-01-01", "2023-12-31")
+        spec = json.loads((ROOT / "strategies/trend_momentum.json").read_text(encoding="utf-8"))
+        res = run_portfolio(make_sleeves([spec]), data, cfg["backtest"])
+        self.assertAlmostEqual(res.equity.iloc[-1], run_backtest(spec, data, cfg["backtest"]).equity.iloc[-1], places=4)
+        p = build_payload(res, {}, "t", "note", 4)
+        self.assertEqual(len(p["equity"]), len(p["dates"]))
+        self.assertTrue(all(0 <= t[0] < len(p["dates"]) for t in p["trades"]))
+        out = render(p, tempfile.mktemp(suffix=".html"))
+        self.assertIn("const D={", out.read_text(encoding="utf-8"))
+
+    def test_two_sleeves_split_capital(self):
+        from sentinel.portfolio import make_sleeves, run_portfolio
+        cfg = load_settings("config/settings_etf.yaml")
+        data = synthetic(cfg["universe"][:6], "2016-01-01", "2023-12-31")
+        a = json.loads((ROOT / "strategies/trend_momentum.json").read_text(encoding="utf-8"))
+        res = run_portfolio(make_sleeves([a, BASE], [3, 1]), data, cfg["backtest"])
+        self.assertAlmostEqual(res.sleeves["trend_momentum"].iloc[0], 75000, delta=1)
+        self.assertEqual(set(res.trades.strategy), {"trend_momentum", "trend_pullback"})

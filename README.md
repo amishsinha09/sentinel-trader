@@ -162,6 +162,22 @@ Robinhood has no public stock-trading API for bots. Use `execution.broker: ticke
 
 Set `execution.options_enabled: true`. A bullish signal maps to a structure by IV regime: call debit spread, long call when conviction is high and IV is low, or bull put credit spread when IV is high. Contracts are chosen for liquidity (OI, bid/ask %), 14–60 DTE, and target deltas, then sized so max loss stays within `options.max_loss_per_trade_pct`. Only defined-risk structures are allowed. Without a broker chain feed, the bot logs the intended structure only. Options backtesting is not modelled yet, so validate option rules on paper first.
 
+## Animated replay (one or more strategies, one account)
+
+```bash
+python -m sentinel --settings config/settings_etf.yaml replay              # current trend strategy
+python -m sentinel --settings config/settings_etf.yaml replay --spec strategies/trend_momentum.json \
+       --spec strategies/my_other_idea.json --weights 0.6,0.4                  # several strategies share the account
+start state_etf\replay.html                                                     # Windows; open in any browser
+```
+
+A self-contained page that plays the whole backtest in about 24 seconds: account balance, the equity
+curve drawn against buy & hold, a node map where each market (one strategy) or each strategy (several)
+flashes green or red as trades close, a monthly heatmap, a trade log and a leaderboard, with
+play/pause, speed and a scrubber. Test and final-exam years are shaded, and a footer states each
+strategy's real validation status. Each strategy runs in its own capital sleeve with the same engine and
+costs; a combined portfolio is still a new candidate and must pass the gate before it trades.
+
 ## Research profiles and new ideas
 
 ```bash

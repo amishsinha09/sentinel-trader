@@ -2,143 +2,143 @@
  "strategy": "2d4388055caf",
  "rules": "LONG when close > sma(sma_trend) AND roc(mom_period) > 0; exit when close < sma(sma_trend); stop 5.0xATR, target 20.0xATR, max hold 250 bars; rank by roc(mom_period)",
  "stop_atr": 5.0,
- "as_of": "2026-11-09",
- "generated": "2026-11-09T22:14:52+00:00",
+ "as_of": "2026-11-10",
+ "generated": "2026-11-10T19:37:44+00:00",
  "symbols": {
   "XLK": {
-   "date": "2026-11-09",
-   "close": 170.88,
+   "date": "2026-11-10",
+   "close": 168.08,
    "entry": false,
-   "exit": false,
-   "rank": -3.7085,
-   "atr": 4.8756,
-   "stop_if_bought": 146.5
+   "exit": true,
+   "rank": -3.8374,
+   "atr": 4.8833,
+   "stop_if_bought": 143.66
   },
   "XLF": {
-   "date": "2026-11-09",
-   "close": 57.99,
+   "date": "2026-11-10",
+   "close": 58.375,
    "entry": true,
    "exit": false,
-   "rank": 14.1053,
-   "atr": 0.9003,
-   "stop_if_bought": 53.49
+   "rank": 13.9721,
+   "atr": 0.8825,
+   "stop_if_bought": 53.96
   },
   "XLE": {
-   "date": "2026-11-09",
-   "close": 61.94,
+   "date": "2026-11-10",
+   "close": 62.2,
    "entry": true,
    "exit": false,
-   "rank": 9.7735,
-   "atr": 1.5779,
-   "stop_if_bought": 54.05
+   "rank": 9.4684,
+   "atr": 1.5957,
+   "stop_if_bought": 54.22
   },
   "XLV": {
-   "date": "2026-11-09",
-   "close": 188.33,
+   "date": "2026-11-10",
+   "close": 188.48,
    "entry": true,
    "exit": false,
-   "rank": 32.7493,
-   "atr": 3.3882,
-   "stop_if_bought": 171.39
+   "rank": 30.2953,
+   "atr": 3.3093,
+   "stop_if_bought": 171.93
   },
   "XLI": {
-   "date": "2026-11-09",
-   "close": 168.89,
+   "date": "2026-11-10",
+   "close": 168.32,
    "entry": false,
    "exit": true,
-   "rank": -3.0161,
-   "atr": 3.1017,
-   "stop_if_bought": 153.38
+   "rank": -2.9609,
+   "atr": 3.0566,
+   "stop_if_bought": 153.04
   },
   "XLY": {
-   "date": "2026-11-09",
-   "close": 121.01,
+   "date": "2026-11-10",
+   "close": 120.92,
    "entry": true,
    "exit": false,
-   "rank": 1.7996,
-   "atr": 2.2328,
-   "stop_if_bought": 109.85
+   "rank": 2.6526,
+   "atr": 2.1712,
+   "stop_if_bought": 110.06
   },
   "XLP": {
-   "date": "2026-11-09",
-   "close": 90.89,
+   "date": "2026-11-10",
+   "close": 91.155,
    "entry": true,
    "exit": false,
-   "rank": 10.4984,
-   "atr": 1.4797,
-   "stop_if_bought": 83.49
+   "rank": 9.4163,
+   "atr": 1.4658,
+   "stop_if_bought": 83.83
   },
   "XLU": {
-   "date": "2026-11-09",
-   "close": 43.79,
+   "date": "2026-11-10",
+   "close": 43.665,
    "entry": false,
    "exit": true,
-   "rank": -1.6534,
-   "atr": 0.6596,
-   "stop_if_bought": 40.49
+   "rank": -2.0426,
+   "atr": 0.6505,
+   "stop_if_bought": 40.41
   },
   "XLB": {
-   "date": "2026-11-09",
-   "close": 52.94,
+   "date": "2026-11-10",
+   "close": 52.81,
    "entry": true,
    "exit": false,
-   "rank": 2.1479,
-   "atr": 0.9179,
-   "stop_if_bought": 48.35
+   "rank": 2.1316,
+   "atr": 0.9058,
+   "stop_if_bought": 48.28
   },
   "IWM": {
-   "date": "2026-11-09",
-   "close": 282.51,
+   "date": "2026-11-10",
+   "close": 280.0,
    "entry": false,
    "exit": false,
-   "rank": -0.4936,
-   "atr": 4.6743,
-   "stop_if_bought": 259.14
+   "rank": -0.4144,
+   "atr": 4.6705,
+   "stop_if_bought": 256.65
   },
   "EFA": {
-   "date": "2026-11-09",
-   "close": 104.96,
+   "date": "2026-11-10",
+   "close": 104.245,
    "entry": true,
    "exit": false,
-   "rank": 2.7771,
-   "atr": 1.3284,
-   "stop_if_bought": 98.32
+   "rank": 2.6708,
+   "atr": 1.3255,
+   "stop_if_bought": 97.62
   },
   "EEM": {
-   "date": "2026-11-09",
-   "close": 61.03,
+   "date": "2026-11-10",
+   "close": 60.485,
    "entry": false,
    "exit": true,
-   "rank": -9.6373,
-   "atr": 1.2962,
-   "stop_if_bought": 54.55
+   "rank": -7.6278,
+   "atr": 1.2797,
+   "stop_if_bought": 54.09
   },
   "TLT": {
-   "date": "2026-11-09",
-   "close": 81.96,
+   "date": "2026-11-10",
+   "close": 80.85,
    "entry": false,
    "exit": true,
-   "rank": -2.3236,
-   "atr": 0.7561,
-   "stop_if_bought": 78.18
+   "rank": -3.0002,
+   "atr": 0.7891,
+   "stop_if_bought": 76.9
   },
   "IEF": {
-   "date": "2026-11-09",
-   "close": 91.8,
+   "date": "2026-11-10",
+   "close": 91.025,
    "entry": false,
    "exit": true,
-   "rank": -1.3273,
-   "atr": 0.4664,
-   "stop_if_bought": 89.47
+   "rank": -1.8284,
+   "atr": 0.4911,
+   "stop_if_bought": 88.57
   },
   "GLD": {
-   "date": "2026-11-09",
-   "close": 379.53,
+   "date": "2026-11-10",
+   "close": 369.0,
    "entry": false,
    "exit": true,
-   "rank": -12.6815,
-   "atr": 6.6303,
-   "stop_if_bought": 346.38
+   "rank": -14.7668,
+   "atr": 6.8853,
+   "stop_if_bought": 334.57
   }
  }
 }
